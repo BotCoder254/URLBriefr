@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiLink, FiCopy, FiArrowRight, FiCheckCircle, FiAlertCircle, FiSettings, FiX, FiClock, FiTag, FiCode } from 'react-icons/fi';
+import { FiLink, FiCopy, FiArrowRight, FiCheckCircle, FiAlertCircle, FiSettings, FiX, FiClock, FiTag, FiCode, FiCalendar } from 'react-icons/fi';
 import urlService from '../services/urlService';
 
 const HomePage = () => {
@@ -16,7 +16,16 @@ const HomePage = () => {
   // Advanced options
   const [customCode, setCustomCode] = useState('');
   const [title, setTitle] = useState('');
+  const [expirationType, setExpirationType] = useState('never');
   const [expirationDays, setExpirationDays] = useState('');
+  const [expirationDate, setExpirationDate] = useState('');
+  
+  // Get tomorrow's date in YYYY-MM-DD format for min date in date picker
+  const getTomorrowDate = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  };
   
   const validateUrl = (url) => {
     // Simple URL validation
@@ -57,7 +66,17 @@ const HomePage = () => {
       if (showAdvancedOptions) {
         if (customCode) urlData.custom_code = customCode;
         if (title) urlData.title = title;
-        if (expirationDays) urlData.expiration_days = parseInt(expirationDays, 10);
+        
+        // Handle expiration based on type
+        if (expirationType === 'days' && expirationDays) {
+          urlData.expiration_type = 'days';
+          urlData.expiration_days = parseInt(expirationDays, 10);
+        } else if (expirationType === 'date' && expirationDate) {
+          urlData.expiration_type = 'date';
+          urlData.expiration_date = expirationDate;
+        } else if (expirationType === 'never') {
+          urlData.expiration_type = 'never';
+        }
       }
       
       const response = await urlService.createUrl(urlData);
@@ -74,6 +93,10 @@ const HomePage = () => {
           errorMessage = error.response.data.custom_code[0];
         } else if (error.response.data.detail) {
           errorMessage = error.response.data.detail;
+        } else if (error.response.data.expiration_date) {
+          errorMessage = error.response.data.expiration_date[0];
+        } else if (error.response.data.expiration_days) {
+          errorMessage = error.response.data.expiration_days[0];
         }
       }
       
@@ -253,22 +276,54 @@ const HomePage = () => {
                           </div>
                           
                           <div>
-                            <label htmlFor="expiration" className="block text-sm font-medium text-dark-700 mb-1">
+                            <label htmlFor="expiration_type" className="block text-sm font-medium text-dark-700 mb-1">
                               <FiClock className="inline mr-1" /> Expiration (Optional)
                             </label>
                             <select
-                              id="expiration"
-                              value={expirationDays}
-                              onChange={(e) => setExpirationDays(e.target.value)}
-                              className="input w-full py-2"
+                              id="expiration_type"
+                              value={expirationType}
+                              onChange={(e) => setExpirationType(e.target.value)}
+                              className="input w-full py-2 mb-2"
                             >
-                              <option value="">Never expires</option>
-                              <option value="1">1 day</option>
-                              <option value="7">7 days</option>
-                              <option value="30">30 days</option>
-                              <option value="90">90 days</option>
-                              <option value="365">1 year</option>
+                              <option value="never">Never expires</option>
+                              <option value="days">Expire after days</option>
+                              <option value="date">Expire on specific date</option>
                             </select>
+                            
+                            {expirationType === 'days' && (
+                              <select
+                                id="expiration_days"
+                                value={expirationDays}
+                                onChange={(e) => setExpirationDays(e.target.value)}
+                                className="input w-full py-2"
+                              >
+                                <option value="">Select number of days</option>
+                                <option value="1">1 day</option>
+                                <option value="7">7 days</option>
+                                <option value="30">30 days</option>
+                                <option value="90">90 days</option>
+                                <option value="365">1 year</option>
+                              </select>
+                            )}
+                            
+                            {expirationType === 'date' && (
+                              <div>
+                                <div className="flex items-center">
+                                  <FiCalendar className="text-dark-400 mr-2" />
+                                  <input
+                                    type="date"
+                                    id="expiration_date"
+                                    value={expirationDate}
+                                    onChange={(e) => setExpirationDate(e.target.value)}
+                                    min={getTomorrowDate()}
+                                    className="input w-full py-2"
+                                  />
+                                </div>
+                                <p className="mt-1 text-xs text-dark-500">
+                                  The URL will expire at the end of the selected day.
+                                </p>
+                              </div>
+                            )}
                           </div>
                         </motion.div>
                       )}

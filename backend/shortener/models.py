@@ -63,3 +63,18 @@ class ShortenedURL(models.Model):
         self.access_count += 1
         self.last_accessed = timezone.now()
         self.save(update_fields=['access_count', 'last_accessed'])
+        
+    @classmethod
+    def deactivate_expired_urls(cls):
+        """Find and deactivate all expired URLs."""
+        now = timezone.now()
+        expired_urls = cls.objects.filter(
+            expires_at__lt=now,
+            is_active=True
+        )
+        
+        count = expired_urls.count()
+        if count > 0:
+            expired_urls.update(is_active=False)
+            
+        return count

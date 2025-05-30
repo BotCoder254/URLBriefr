@@ -17,6 +17,7 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import URLAnalyticsPage from './pages/URLAnalyticsPage';
 import ProfilePage from './pages/ProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
+import RedirectPage from './pages/RedirectPage';
 
 function App() {
   return (
@@ -28,6 +29,9 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:uidb64/:token" element={<ResetPasswordPage />} />
+          
+          {/* URL Redirection route */}
+          <Route path="/s/:shortCode" element={<RedirectPage />} />
           
           {/* Routes with layout */}
           <Route

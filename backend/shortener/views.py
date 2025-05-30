@@ -69,7 +69,26 @@ def redirect_to_original(request, short_code):
     
     # Check if URL is active and not expired
     if not url.is_active or url.is_expired():
-        return Response({'error': 'This URL has expired or is not active.'}, status=status.HTTP_404_NOT_FOUND)
+        error_reason = 'expired' if url.is_expired() else 'inactive'
+        expiry_date = url.expires_at.isoformat() if url.expires_at else None
+        
+        # Get the owner's email if available
+        owner_email = url.user.email if url.user else None
+        
+        return Response({
+            'error': 'This URL has expired or is not active.',
+            'status': 'error',
+            'reason': error_reason,
+            'url_info': {
+                'short_code': url.short_code,
+                'title': url.title,
+                'created_at': url.created_at.isoformat(),
+                'expires_at': expiry_date,
+                'is_active': url.is_active,
+                'is_expired': url.is_expired(),
+                'owner': owner_email
+            }
+        }, status=status.HTTP_404_NOT_FOUND)
     
     # Record analytics
     client_ip, is_routable = ipware.ip.get_client_ip(request)

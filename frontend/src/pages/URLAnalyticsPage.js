@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiArrowLeft, FiBarChart2, FiGlobe, FiClock, FiCalendar, FiCopy, FiCheckCircle, FiAlertCircle, FiToggleLeft, FiToggleRight, FiSmartphone, FiMonitor, FiTablet } from 'react-icons/fi';
+import { FiArrowLeft, FiBarChart2, FiGlobe, FiClock, FiCalendar, FiCopy, FiCheckCircle, FiAlertCircle, FiToggleLeft, FiToggleRight, FiSmartphone, FiMonitor, FiTablet, FiUser } from 'react-icons/fi';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import urlService from '../services/urlService';
 
@@ -149,6 +149,160 @@ const URLAnalyticsPage = () => {
     }
   };
   
+  // Add this section to display the location data
+  const LocationSection = ({ analytics }) => {
+    if (!analytics || !analytics.clicks_by_country || analytics.clicks_by_country.length === 0) {
+      return null;
+    }
+    
+    return (
+      <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-soft p-6">
+        <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
+          Location Analytics
+        </h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Country chart */}
+          <div>
+            <h4 className="text-base font-medium text-dark-800 mb-3">Top Countries</h4>
+            <div className="h-60">
+              {analytics.clicks_by_country.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={analytics.clicks_by_country.map(item => ({
+                      name: item.country || 'Unknown',
+                      clicks: item.count
+                    }))}
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, left: 50, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis 
+                      type="category" 
+                      dataKey="name" 
+                      tick={{ fontSize: 12 }}
+                      width={80}
+                    />
+                    <Tooltip />
+                    <Bar dataKey="clicks" fill="#0ea5e9" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <p className="text-dark-400">No country data available</p>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* City table */}
+          <div>
+            <h4 className="text-base font-medium text-dark-800 mb-3">Top Cities</h4>
+            {analytics.clicks_by_city && analytics.clicks_by_city.length > 0 ? (
+              <div className="overflow-auto h-60 rounded-lg border border-gray-200">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                        City
+                      </th>
+                      <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                        Country
+                      </th>
+                      <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                        Clicks
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {analytics.clicks_by_city.map((city, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-dark-800">
+                          {city.city || 'Unknown'}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
+                          {city.country || 'Unknown'}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
+                          {city.count}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="flex h-60 items-center justify-center border border-gray-200 rounded-lg">
+                <p className="text-dark-400">No city data available</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
+  // Add this section to display recent visitors with IP data
+  const RecentVisitorsSection = ({ analytics }) => {
+    if (!analytics || !analytics.recent_clicks || analytics.recent_clicks.length === 0) {
+      return null;
+    }
+    
+    return (
+      <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-soft p-6">
+        <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
+          Recent Visitors
+        </h3>
+        
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                  Time
+                </th>
+                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                  IP Address
+                </th>
+                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                  Location
+                </th>
+                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                  Device / Browser
+                </th>
+                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                  OS
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {analytics.recent_clicks.map((click, index) => (
+                <tr key={index} className="hover:bg-gray-50">
+                  <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
+                    {new Date(click.timestamp).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-2 whitespace-nowrap text-sm font-mono text-dark-700">
+                    {click.ip_address || 'Unknown'}
+                  </td>
+                  <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
+                    {click.city ? `${click.city}, ` : ''}{click.country || 'Unknown'}
+                  </td>
+                  <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
+                    {click.device || 'Unknown'} / {(click.browser || 'Unknown').split(' ')[0]}
+                  </td>
+                  <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
+                    {(click.os || 'Unknown').split(' ')[0]}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </motion.div>
+    );
+  };
+  
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
@@ -257,7 +411,7 @@ const URLAnalyticsPage = () => {
               </motion.div>
               
               {/* Stats Overview */}
-              <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 <div className="bg-white rounded-xl shadow-soft p-6">
                   <div className="flex items-center">
                     <div className="h-12 w-12 rounded-md bg-primary-500 text-white flex items-center justify-center mr-4">
@@ -267,6 +421,20 @@ const URLAnalyticsPage = () => {
                       <p className="text-dark-500 text-sm font-medium">Total Clicks</p>
                       <h3 className="text-2xl font-display font-bold text-dark-900">
                         {analytics.total_clicks || 0}
+                      </h3>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white rounded-xl shadow-soft p-6">
+                  <div className="flex items-center">
+                    <div className="h-12 w-12 rounded-md bg-secondary-500 text-white flex items-center justify-center mr-4">
+                      <FiUser className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="text-dark-500 text-sm font-medium">Unique Visitors</p>
+                      <h3 className="text-2xl font-display font-bold text-dark-900">
+                        {analytics.unique_visitors || 0}
                       </h3>
                     </div>
                   </div>
@@ -464,54 +632,11 @@ const URLAnalyticsPage = () => {
                 </div>
               </motion.div>
               
-              {/* Device Details Table */}
-              {analytics.clicks_by_device && analytics.clicks_by_device.length > 0 && (
-                <motion.div variants={itemVariants}>
-                  <div className="bg-white rounded-xl shadow-soft p-6">
-                    <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
-                      Device Breakdown
-                    </h3>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
-                              Device Type
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
-                              Clicks
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
-                              Percentage
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {analytics.clicks_by_device.map((device, index) => {
-                            const total = analytics.clicks_by_device.reduce((sum, item) => sum + item.count, 0);
-                            const percentage = ((device.count / total) * 100).toFixed(1);
-                            
-                            return (
-                              <tr key={index} className="hover:bg-gray-50">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-dark-800 flex items-center">
-                                  {getDeviceIcon(device.device || 'Unknown')}
-                                  {device.device || 'Unknown'}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-700">
-                                  {device.count}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-700">
-                                  {percentage}%
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
+              {/* Add the new location section */}
+              <LocationSection analytics={analytics} />
+              
+              {/* Add the recent visitors section */}
+              <RecentVisitorsSection analytics={analytics} />
             </>
           )}
         </motion.div>

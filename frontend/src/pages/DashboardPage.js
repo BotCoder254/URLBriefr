@@ -11,6 +11,7 @@ const DashboardPage = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showExpirationModal, setShowExpirationModal] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [copied, setCopied] = useState(null);
@@ -28,12 +29,28 @@ const DashboardPage = () => {
     is_active: true
   });
   
+  // Expiration form state
+  const [expirationForm, setExpirationForm] = useState({
+    expirationType: 'never',
+    expirationDays: '',
+    expirationDate: ''
+  });
+  
   // Form errors
   const [formErrors, setFormErrors] = useState({});
+  const [expirationErrors, setExpirationErrors] = useState({});
   
   // Form submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createSuccess, setCreateSuccess] = useState(false);
+  const [expirationUpdating, setExpirationUpdating] = useState(false);
+  
+  // Get tomorrow's date in YYYY-MM-DD format for min date in date picker
+  const getTomorrowDate = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  };
   
   useEffect(() => {
     fetchUrls();
@@ -287,6 +304,116 @@ const DashboardPage = () => {
     visible: { opacity: 1, y: 0 }
   };
   
+  const handleExpirationClick = (url) => {
+    setSelectedUrl(url);
+    
+    // Initialize form based on current URL expiration
+    if (url.expires_at) {
+      const expiresAt = new Date(url.expires_at);
+      const today = new Date();
+      const diffTime = Math.abs(expiresAt - today);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Check if it's a standard expiration period
+      if (diffDays === 1 || diffDays === 7 || diffDays === 30 || diffDays === 90 || diffDays === 365) {
+        setExpirationForm({
+          expirationType: 'days',
+          expirationDays: diffDays.toString(),
+          expirationDate: expiresAt.toISOString().split('T')[0]
+        });
+      } else {
+        setExpirationForm({
+          expirationType: 'date',
+          expirationDays: '',
+          expirationDate: expiresAt.toISOString().split('T')[0]
+        });
+      }
+    } else {
+      setExpirationForm({
+        expirationType: 'never',
+        expirationDays: '',
+        expirationDate: ''
+      });
+    }
+    
+    setShowExpirationModal(true);
+  };
+  
+  const handleExpirationFormChange = (e) => {
+    const { name, value } = e.target;
+    setExpirationForm(prev => ({ ...prev, [name]: value }));
+    
+    // Clear error for this field if it exists
+    if (expirationErrors[name]) {
+      setExpirationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+  };
+  
+  const handleUpdateExpiration = async () => {
+    if (!selectedUrl) return;
+    
+    // Validate form
+    const errors = {};
+    if (expirationForm.expirationType === 'days' && !expirationForm.expirationDays) {
+      errors.expirationDays = 'Please select number of days';
+    }
+    
+    if (expirationForm.expirationType === 'date' && !expirationForm.expirationDate) {
+      errors.expirationDate = 'Please select a date';
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setExpirationErrors(errors);
+      return;
+    }
+    
+    setExpirationUpdating(true);
+    setExpirationErrors({});
+    
+    try {
+      let updatedUrl;
+      
+      if (expirationForm.expirationType === 'never') {
+        updatedUrl = await urlService.setUrlExpiration(selectedUrl.id, 'none', null);
+      } else if (expirationForm.expirationType === 'days') {
+        updatedUrl = await urlService.setUrlExpiration(
+          selectedUrl.id, 
+          'days', 
+          parseInt(expirationForm.expirationDays, 10)
+        );
+      } else if (expirationForm.expirationType === 'date') {
+        updatedUrl = await urlService.setUrlExpiration(
+          selectedUrl.id,
+          'date',
+          expirationForm.expirationDate
+        );
+      }
+      
+      // Update URL in list
+      setUrls(prevUrls => 
+        prevUrls.map(item => 
+          item.id === selectedUrl.id ? updatedUrl : item
+        )
+      );
+      
+      setShowExpirationModal(false);
+      setSelectedUrl(null);
+    } catch (err) {
+      console.error('Error updating URL expiration:', err);
+      setExpirationErrors({
+        submit: err.response?.data?.expiration_date?.[0] || 
+                err.response?.data?.expiration_days?.[0] || 
+                'Failed to update expiration. Please try again.'
+      });
+    } finally {
+      setExpirationUpdating(false);
+    }
+  };
+  
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
@@ -415,6 +542,9 @@ const DashboardPage = () => {
                         Clicks
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                        Expiration
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
                         Created
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
@@ -475,17 +605,34 @@ const DashboardPage = () => {
                             {url.access_count}
                           </Link>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-500">
-                          <div className="flex flex-col">
-                            <div className="flex items-center">
-                              <FiCalendar className="mr-1 h-3 w-3" /> {formatDate(url.created_at)}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {url.expires_at ? (
+                            <div className={`flex items-center text-sm ${isExpired(url) ? 'text-red-500' : 'text-dark-500'}`}>
+                              <FiClock className="mr-1 h-4 w-4" /> 
+                              <span>{formatDate(url.expires_at)}</span>
+                              <button
+                                onClick={() => handleExpirationClick(url)}
+                                className="ml-2 text-primary-600 hover:text-primary-700"
+                                title="Change expiration"
+                              >
+                                <FiEdit className="h-3 w-3" />
+                              </button>
                             </div>
-                            {url.expires_at && (
-                              <div className={`flex items-center text-xs mt-1 ${isExpired(url) ? 'text-red-500' : 'text-dark-400'}`}>
-                                <FiClock className="mr-1 h-3 w-3" /> Expires: {formatDate(url.expires_at)}
-                              </div>
-                            )}
-                          </div>
+                          ) : (
+                            <div className="flex items-center text-sm text-dark-500">
+                              <span>Never</span>
+                              <button
+                                onClick={() => handleExpirationClick(url)}
+                                className="ml-2 text-primary-600 hover:text-primary-700"
+                                title="Set expiration"
+                              >
+                                <FiEdit className="h-3 w-3" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-500">
+                          {formatDate(url.created_at)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-500">
                           <div className="flex space-x-3">
@@ -793,14 +940,28 @@ const DashboardPage = () => {
                   <p>{formatDateTime(selectedUrl.created_at)}</p>
                 </div>
                 
-                {selectedUrl.expires_at && (
-                  <div>
-                    <p className="text-sm text-dark-500 mb-1">Expires</p>
-                    <p className={isExpired(selectedUrl) ? 'text-red-500' : ''}>
-                      {formatDateTime(selectedUrl.expires_at)}
-                    </p>
+                <div>
+                  <p className="text-sm text-dark-500 mb-1">Expiration</p>
+                  <div className="flex items-center">
+                    {selectedUrl.expires_at ? (
+                      <span className={isExpired(selectedUrl) ? 'text-red-500' : ''}>
+                        {formatDateTime(selectedUrl.expires_at)}
+                      </span>
+                    ) : (
+                      <span>Never expires</span>
+                    )}
+                    <button
+                      onClick={() => {
+                        setShowDetailsModal(false);
+                        handleExpirationClick(selectedUrl);
+                      }}
+                      className="ml-2 text-primary-600 hover:text-primary-700"
+                      title="Change expiration"
+                    >
+                      <FiEdit className="h-3 w-3" />
+                    </button>
                   </div>
-                )}
+                </div>
                 
                 <div>
                   <p className="text-sm text-dark-500 mb-1">Last Accessed</p>
@@ -826,6 +987,15 @@ const DashboardPage = () => {
                 <div className="flex space-x-3">
                   <button
                     onClick={() => {
+                      setShowDetailsModal(false);
+                      handleExpirationClick(selectedUrl);
+                    }}
+                    className="btn btn-outline"
+                  >
+                    <FiClock className="mr-2" /> Manage Expiration
+                  </button>
+                  <button
+                    onClick={() => {
                       handleDeleteClick(selectedUrl);
                       setShowDetailsModal(false);
                     }}
@@ -843,6 +1013,139 @@ const DashboardPage = () => {
                     Close
                   </button>
                 </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+      
+      {/* Expiration Modal */}
+      {showExpirationModal && selectedUrl && (
+        <div className="fixed inset-0 bg-dark-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-xl shadow-soft p-6 max-w-md w-full"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-display font-semibold text-dark-900">Set URL Expiration</h2>
+              <button
+                onClick={() => {
+                  setShowExpirationModal(false);
+                  setSelectedUrl(null);
+                }}
+                className="text-dark-400 hover:text-dark-600"
+              >
+                <FiX className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <p className="text-dark-500">
+                Set when this URL should expire. After expiration, the URL will no longer redirect to the original destination.
+              </p>
+            </div>
+            
+            {expirationErrors.submit && (
+              <div className="bg-red-50 text-red-700 p-3 rounded-lg flex items-start mb-4">
+                <FiAlertCircle className="mr-2 mt-0.5 flex-shrink-0" />
+                <span>{expirationErrors.submit}</span>
+              </div>
+            )}
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-dark-700 mb-1">
+                  Expiration Type
+                </label>
+                <select
+                  name="expirationType"
+                  value={expirationForm.expirationType}
+                  onChange={handleExpirationFormChange}
+                  className="input w-full py-2"
+                >
+                  <option value="never">Never expires</option>
+                  <option value="days">Expire after days</option>
+                  <option value="date">Expire on specific date</option>
+                </select>
+              </div>
+              
+              {expirationForm.expirationType === 'days' && (
+                <div>
+                  <label className="block text-sm font-medium text-dark-700 mb-1">
+                    Number of Days
+                  </label>
+                  <select
+                    name="expirationDays"
+                    value={expirationForm.expirationDays}
+                    onChange={handleExpirationFormChange}
+                    className={`input w-full py-2 ${expirationErrors.expirationDays ? 'border-red-500' : ''}`}
+                  >
+                    <option value="">Select number of days</option>
+                    <option value="1">1 day</option>
+                    <option value="7">7 days</option>
+                    <option value="30">30 days</option>
+                    <option value="90">90 days</option>
+                    <option value="365">1 year</option>
+                  </select>
+                  {expirationErrors.expirationDays && (
+                    <p className="mt-1 text-sm text-red-600">{expirationErrors.expirationDays}</p>
+                  )}
+                </div>
+              )}
+              
+              {expirationForm.expirationType === 'date' && (
+                <div>
+                  <label className="block text-sm font-medium text-dark-700 mb-1">
+                    Expiration Date
+                  </label>
+                  <div className="flex items-center">
+                    <FiCalendar className="text-dark-400 mr-2" />
+                    <input
+                      type="date"
+                      name="expirationDate"
+                      value={expirationForm.expirationDate}
+                      onChange={handleExpirationFormChange}
+                      min={getTomorrowDate()}
+                      className={`input w-full py-2 ${expirationErrors.expirationDate ? 'border-red-500' : ''}`}
+                    />
+                  </div>
+                  {expirationErrors.expirationDate && (
+                    <p className="mt-1 text-sm text-red-600">{expirationErrors.expirationDate}</p>
+                  )}
+                  <p className="mt-1 text-xs text-dark-500">
+                    The URL will expire at the end of the selected day.
+                  </p>
+                </div>
+              )}
+              
+              <div className="pt-4 flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowExpirationModal(false);
+                    setSelectedUrl(null);
+                  }}
+                  className="btn btn-outline"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdateExpiration}
+                  disabled={expirationUpdating}
+                  className="btn btn-primary"
+                >
+                  {expirationUpdating ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Updating...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </button>
               </div>
             </div>
           </motion.div>

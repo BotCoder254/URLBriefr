@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { 
   FiBarChart2, FiPieChart, FiTrendingUp, FiGlobe, FiMonitor, FiSmartphone, 
-  FiAlertCircle, FiClock, FiCalendar, FiLink, FiExternalLink, FiCheckCircle 
+  FiAlertCircle, FiClock, FiCalendar, FiLink, FiExternalLink, FiCheckCircle, FiUser
 } from 'react-icons/fi';
 import { 
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, 
@@ -84,6 +84,258 @@ const AnalyticsPage = () => {
     visible: { opacity: 1, y: 0 }
   };
   
+  // Add to the Stats Overview section
+  const StatsOverview = ({ dashboardStats }) => {
+    return (
+      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="bg-white rounded-xl shadow-soft p-6">
+          <div className="flex items-center">
+            <div className="h-12 w-12 rounded-md bg-primary-500 text-white flex items-center justify-center mr-4">
+              <FiLink className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-dark-500 text-sm font-medium">Total URLs</p>
+              <h3 className="text-2xl font-display font-bold text-dark-900">
+                {dashboardStats.total_urls || 0}
+              </h3>
+              <span className="text-xs text-accent-600">
+                {dashboardStats.active_urls || 0} active
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-xl shadow-soft p-6">
+          <div className="flex items-center">
+            <div className="h-12 w-12 rounded-md bg-secondary-500 text-white flex items-center justify-center mr-4">
+              <FiTrendingUp className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-dark-500 text-sm font-medium">Total Clicks</p>
+              <h3 className="text-2xl font-display font-bold text-dark-900">
+                {dashboardStats.total_clicks || 0}
+              </h3>
+              <span className="text-xs text-accent-600">
+                {dashboardStats.clicks_last_24h || 0} in last 24h
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-xl shadow-soft p-6">
+          <div className="flex items-center">
+            <div className="h-12 w-12 rounded-md bg-accent-500 text-white flex items-center justify-center mr-4">
+              <FiUser className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-dark-500 text-sm font-medium">Unique Visitors</p>
+              <h3 className="text-2xl font-display font-bold text-dark-900">
+                {dashboardStats.unique_visitors || 0}
+              </h3>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-xl shadow-soft p-6">
+          <div className="flex items-center">
+            <div className="h-12 w-12 rounded-md bg-accent-500 text-white flex items-center justify-center mr-4">
+              <FiBarChart2 className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-dark-500 text-sm font-medium">Avg. Clicks Per URL</p>
+              <h3 className="text-2xl font-display font-bold text-dark-900">
+                {dashboardStats.total_urls > 0 ? 
+                  (dashboardStats.total_clicks / dashboardStats.total_urls).toFixed(1) : 
+                  '0.0'}
+              </h3>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-xl shadow-soft p-6">
+          <div className="flex items-center">
+            <div className="h-12 w-12 rounded-md bg-primary-700 text-white flex items-center justify-center mr-4">
+              <FiClock className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-dark-500 text-sm font-medium">Recently Created</p>
+              <h3 className="text-2xl font-display font-bold text-dark-900">
+                {dashboardStats.recent_urls?.length || 0}
+              </h3>
+              <span className="text-xs text-accent-600">
+                new URLs
+              </span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
+  // Add a new component for location data
+  const LocationDataSection = ({ dashboardStats }) => {
+    if (!dashboardStats || !dashboardStats.clicks_by_country || !dashboardStats.clicks_by_city) {
+      return null;
+    }
+    
+    return (
+      <motion.div variants={itemVariants}>
+        <div className="bg-white rounded-xl shadow-soft p-6">
+          <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
+            Geographic Distribution
+          </h3>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Countries */}
+            <div>
+              <h4 className="text-base font-medium text-dark-800 mb-3">Top Countries</h4>
+              {dashboardStats.clicks_by_country && dashboardStats.clicks_by_country.length > 0 ? (
+                <div className="h-60">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={dashboardStats.clicks_by_country.map(item => ({
+                        name: item.country || 'Unknown',
+                        clicks: item.count
+                      }))}
+                      layout="vertical"
+                      margin={{ top: 5, right: 30, left: 50, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis 
+                        type="category" 
+                        dataKey="name" 
+                        tick={{ fontSize: 12 }}
+                        width={80}
+                      />
+                      <Tooltip />
+                      <Bar dataKey="clicks" fill="#10b981" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="flex h-60 items-center justify-center border border-gray-200 rounded-lg">
+                  <p className="text-dark-400">No country data available</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Cities */}
+            <div>
+              <h4 className="text-base font-medium text-dark-800 mb-3">Top Cities</h4>
+              {dashboardStats.clicks_by_city && dashboardStats.clicks_by_city.length > 0 ? (
+                <div className="overflow-auto h-60 rounded-lg border border-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                          City
+                        </th>
+                        <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                          Country
+                        </th>
+                        <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                          Clicks
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {dashboardStats.clicks_by_city.map((city, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-dark-800">
+                            {city.city || 'Unknown'}
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
+                            {city.country || 'Unknown'}
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
+                            {city.count}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="flex h-60 items-center justify-center border border-gray-200 rounded-lg">
+                  <p className="text-dark-400">No city data available</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
+  // Add a new component for recent visitors
+  const RecentVisitorsSection = ({ dashboardStats }) => {
+    if (!dashboardStats || !dashboardStats.recent_clicks || dashboardStats.recent_clicks.length === 0) {
+      return null;
+    }
+    
+    return (
+      <motion.div variants={itemVariants}>
+        <div className="bg-white rounded-xl shadow-soft p-6">
+          <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
+            Recent Visitors
+          </h3>
+          
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                    Time
+                  </th>
+                  <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                    URL
+                  </th>
+                  <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                    IP Address
+                  </th>
+                  <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                    Location
+                  </th>
+                  <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                    Device / Browser
+                  </th>
+                  <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                    OS
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {dashboardStats.recent_clicks.map((click, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
+                      {new Date(click.timestamp).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-primary-600">
+                      {click.url__short_code}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm font-mono text-dark-700">
+                      {click.ip_address || 'Unknown'}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
+                      {click.city ? `${click.city}, ` : ''}{click.country || 'Unknown'}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
+                      {click.device || 'Unknown'} / {(click.browser || 'Unknown').split(' ')[0]}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
+                      {(click.os || 'Unknown').split(' ')[0]}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
@@ -122,74 +374,7 @@ const AnalyticsPage = () => {
           {dashboardStats && (
             <>
               {/* Stats Overview */}
-              <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white rounded-xl shadow-soft p-6">
-                  <div className="flex items-center">
-                    <div className="h-12 w-12 rounded-md bg-primary-500 text-white flex items-center justify-center mr-4">
-                      <FiLink className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="text-dark-500 text-sm font-medium">Total URLs</p>
-                      <h3 className="text-2xl font-display font-bold text-dark-900">
-                        {dashboardStats.total_urls || 0}
-                      </h3>
-                      <span className="text-xs text-accent-600">
-                        {dashboardStats.active_urls || 0} active
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white rounded-xl shadow-soft p-6">
-                  <div className="flex items-center">
-                    <div className="h-12 w-12 rounded-md bg-secondary-500 text-white flex items-center justify-center mr-4">
-                      <FiTrendingUp className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="text-dark-500 text-sm font-medium">Total Clicks</p>
-                      <h3 className="text-2xl font-display font-bold text-dark-900">
-                        {dashboardStats.total_clicks || 0}
-                      </h3>
-                      <span className="text-xs text-accent-600">
-                        {dashboardStats.clicks_last_24h || 0} in last 24h
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white rounded-xl shadow-soft p-6">
-                  <div className="flex items-center">
-                    <div className="h-12 w-12 rounded-md bg-accent-500 text-white flex items-center justify-center mr-4">
-                      <FiBarChart2 className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="text-dark-500 text-sm font-medium">Avg. Clicks Per URL</p>
-                      <h3 className="text-2xl font-display font-bold text-dark-900">
-                        {dashboardStats.total_urls > 0 ? 
-                          (dashboardStats.total_clicks / dashboardStats.total_urls).toFixed(1) : 
-                          '0.0'}
-                      </h3>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white rounded-xl shadow-soft p-6">
-                  <div className="flex items-center">
-                    <div className="h-12 w-12 rounded-md bg-primary-700 text-white flex items-center justify-center mr-4">
-                      <FiClock className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="text-dark-500 text-sm font-medium">Recently Created</p>
-                      <h3 className="text-2xl font-display font-bold text-dark-900">
-                        {dashboardStats.recent_urls?.length || 0}
-                      </h3>
-                      <span className="text-xs text-accent-600">
-                        new URLs
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
+              <StatsOverview dashboardStats={dashboardStats} />
               
               {/* Charts Row 1 */}
               <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -384,79 +569,11 @@ const AnalyticsPage = () => {
                 </div>
               </motion.div>
               
-              {/* Country Clicks Map */}
-              {dashboardStats.clicks_by_country && dashboardStats.clicks_by_country.length > 0 && (
-                <motion.div variants={itemVariants}>
-                  <div className="bg-white rounded-xl shadow-soft p-6">
-                    <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
-                      Clicks by Country
-                    </h3>
-                    <div className="overflow-hidden">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="h-60">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                              data={dashboardStats.clicks_by_country.map(item => ({
-                                name: item.country || 'Unknown',
-                                clicks: item.count
-                              }))}
-                              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                              layout="vertical"
-                            >
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis type="number" />
-                              <YAxis dataKey="name" type="category" width={100} />
-                              <Tooltip />
-                              <Bar 
-                                dataKey="clicks" 
-                                fill="#10b981" 
-                                radius={[0, 4, 4, 0]}
-                              />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                        <div className="overflow-auto h-60 rounded-lg border border-gray-200">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
-                                  Country
-                                </th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
-                                  Clicks
-                                </th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
-                                  Percentage
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {dashboardStats.clicks_by_country.map((country, index) => {
-                                const total = dashboardStats.clicks_by_country.reduce((sum, item) => sum + item.count, 0);
-                                const percentage = ((country.count / total) * 100).toFixed(1);
-                                
-                                return (
-                                  <tr key={index} className="hover:bg-gray-50">
-                                    <td className="px-6 py-2 whitespace-nowrap text-sm font-medium text-dark-800">
-                                      {country.country || 'Unknown'}
-                                    </td>
-                                    <td className="px-6 py-2 whitespace-nowrap text-sm text-dark-700">
-                                      {country.count}
-                                    </td>
-                                    <td className="px-6 py-2 whitespace-nowrap text-sm text-dark-700">
-                                      {percentage}%
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
+              {/* Location Data */}
+              <LocationDataSection dashboardStats={dashboardStats} />
+              
+              {/* Recent Visitors */}
+              <RecentVisitorsSection dashboardStats={dashboardStats} />
               
               {/* Top URLs Table */}
               <motion.div variants={itemVariants}>
@@ -544,55 +661,6 @@ const AnalyticsPage = () => {
                   )}
                 </div>
               </motion.div>
-              
-              {/* Recent Activity */}
-              {dashboardStats.recent_clicks && dashboardStats.recent_clicks.length > 0 && (
-                <motion.div variants={itemVariants}>
-                  <div className="bg-white rounded-xl shadow-soft p-6">
-                    <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
-                      Recent Click Activity
-                    </h3>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
-                              Time
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
-                              URL
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
-                              Device
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
-                              Browser
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {dashboardStats.recent_clicks.map((click, index) => (
-                            <tr key={index} className="hover:bg-gray-50">
-                              <td className="px-6 py-3 whitespace-nowrap text-sm text-dark-500">
-                                {new Date(click.timestamp).toLocaleString()}
-                              </td>
-                              <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-primary-600">
-                                {click.url__short_code}
-                              </td>
-                              <td className="px-6 py-3 whitespace-nowrap text-sm text-dark-700">
-                                {click.device || 'Unknown'}
-                              </td>
-                              <td className="px-6 py-3 whitespace-nowrap text-sm text-dark-700">
-                                {click.browser || 'Unknown'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
             </>
           )}
         </motion.div>

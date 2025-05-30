@@ -59,6 +59,12 @@ class AnalyticsViewSet(viewsets.ViewSet):
                                  .annotate(count=Count('id')) \
                                  .order_by('-count')
         
+        # Get clicks by city
+        clicks_by_city = clicks.exclude(city__isnull=True).exclude(city='') \
+                              .values('city', 'country') \
+                              .annotate(count=Count('id')) \
+                              .order_by('-count')[:15]
+        
         # Get clicks by OS
         clicks_by_os = clicks.values('os') \
                             .annotate(count=Count('id')) \
@@ -70,19 +76,24 @@ class AnalyticsViewSet(viewsets.ViewSet):
                                   .annotate(count=Count('id')) \
                                   .order_by('-count')[:10]
         
-        # Get recent clicks
-        recent_clicks = clicks.order_by('-timestamp')[:10].values(
-            'timestamp', 'browser', 'device', 'os', 'country', 'ip_address'
+        # Get recent clicks with more details
+        recent_clicks = clicks.order_by('-timestamp')[:20].values(
+            'timestamp', 'browser', 'device', 'os', 'country', 'city', 'ip_address', 'referrer'
         )
+        
+        # Get unique IP addresses
+        unique_ips = clicks.values('ip_address').distinct().count()
         
         return Response({
             'url': ShortenedURLSerializer(url).data,
             'total_clicks': total_clicks,
+            'unique_visitors': unique_ips,
             'clicks_by_date': clicks_by_date,
             'clicks_by_hour': clicks_by_hour,
             'clicks_by_browser': clicks_by_browser,
             'clicks_by_device': clicks_by_device,
             'clicks_by_country': clicks_by_country,
+            'clicks_by_city': clicks_by_city,
             'clicks_by_os': clicks_by_os,
             'clicks_by_referrer': clicks_by_referrer,
             'recent_clicks': recent_clicks
@@ -153,20 +164,31 @@ class AnalyticsViewSet(viewsets.ViewSet):
                                             .annotate(count=Count('id')) \
                                             .order_by('-count')[:10]
         
+        # Get clicks by city
+        clicks_by_city = ClickEvent.objects.filter(url__in=urls) \
+                                         .exclude(city__isnull=True).exclude(city='') \
+                                         .values('city', 'country') \
+                                         .annotate(count=Count('id')) \
+                                         .order_by('-count')[:15]
+        
+        # Get unique IP addresses
+        unique_ips = ClickEvent.objects.filter(url__in=urls).values('ip_address').distinct().count()
+        
         # Get recently created URLs
         recent_urls = urls.order_by('-created_at')[:5]
         recent_urls_data = ShortenedURLSerializer(recent_urls, many=True).data
         
-        # Get recently clicked URLs
+        # Get recently clicked URLs with more details
         recent_clicks = ClickEvent.objects.filter(url__in=urls) \
-                                        .order_by('-timestamp')[:10] \
-                                        .values('timestamp', 'browser', 'device', 'url__short_code')
+                                        .order_by('-timestamp')[:15] \
+                                        .values('timestamp', 'browser', 'device', 'os', 'country', 'city', 'ip_address', 'url__short_code')
         
         return Response({
             'total_urls': total_urls,
             'active_urls': active_urls,
             'expired_urls': expired_urls,
             'total_clicks': total_clicks,
+            'unique_visitors': unique_ips,
             'clicks_last_24h': clicks_last_24h,
             'top_urls': top_urls_data,
             'recent_urls': recent_urls_data,
@@ -176,5 +198,6 @@ class AnalyticsViewSet(viewsets.ViewSet):
             'clicks_by_browser': clicks_by_browser,
             'clicks_by_os': clicks_by_os,
             'clicks_by_country': clicks_by_country,
+            'clicks_by_city': clicks_by_city,
             'recent_clicks': recent_clicks
         })
