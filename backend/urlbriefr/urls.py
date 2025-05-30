@@ -16,15 +16,17 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from shortener.urls import api_urlpatterns as shortener_api_urlpatterns
+from shortener.urls import urlpatterns as shortener_urlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     
     # API endpoints
     path('api/auth/', include('authentication.urls')),
-    path('api/', include('shortener.urls')),
+    path('api/', include(shortener_api_urlpatterns)),
     path('api/', include('analytics.urls')),
     
     # URL shortener redirect (non-API endpoint)
-    path('', include('shortener.urls')),
+    path('', include(shortener_urlpatterns)),
 ]

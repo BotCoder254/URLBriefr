@@ -98,6 +98,43 @@ const urlService = {
     
     const response = await api.patch(`/urls/${id}/`, urlData);
     return response.data;
+  },
+  
+  // Get QR code image URL for a shortened URL
+  getQRCodeUrl: (shortCode) => {
+    return `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/qr/${shortCode}`;
+  },
+  
+  // Get QR code as base64 data for embedding in pages
+  getQRCodeBase64: async (shortCode) => {
+    try {
+      const response = await api.get(`/qr/${shortCode}/?format=base64`);
+      return response.data.qr_code;
+    } catch (error) {
+      console.error('Error getting QR code:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Download QR code as image file
+  downloadQRCode: async (shortCode, fileName = null) => {
+    try {
+      // Create a direct link to download the QR code
+      const qrCodeUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/qr/${shortCode}/`;
+      
+      // Create an anchor element and simulate a click to download
+      const link = document.createElement('a');
+      link.href = qrCodeUrl;
+      link.download = fileName || `qr-${shortCode}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      return true;
+    } catch (error) {
+      console.error('Error downloading QR code:', error);
+      throw error;
+    }
   }
 };
 

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiLink, FiCopy, FiArrowRight, FiCheckCircle, FiAlertCircle, FiSettings, FiX, FiClock, FiTag, FiCode, FiCalendar } from 'react-icons/fi';
+import { FiLink, FiCopy, FiArrowRight, FiCheckCircle, FiAlertCircle, FiSettings, FiX, FiClock, FiTag, FiCode, FiCalendar, FiGrid } from 'react-icons/fi';
 import urlService from '../services/urlService';
+import QRCodeModal from '../components/url/QRCodeModal';
 
 const HomePage = () => {
   const [originalUrl, setOriginalUrl] = useState('');
@@ -12,6 +13,7 @@ const HomePage = () => {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
   
   // Advanced options
   const [customCode, setCustomCode] = useState('');
@@ -388,7 +390,17 @@ const HomePage = () => {
                                   <span className="font-medium">Expires:</span> {formatDate(shortenedUrlData.expires_at)}
                                 </p>
                               )}
-                              <div className="pt-2">
+                              <div className="pt-3 flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowQRCode(true)}
+                                  className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-secondary-700 bg-secondary-100 hover:bg-secondary-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500"
+                                >
+                                  <FiGrid className="mr-1" /> Generate QR Code
+                                </button>
+                                
+                                <div className="flex-grow"></div>
+                                
                                 <Link
                                   to="/login"
                                   className="text-primary-600 hover:text-primary-800 font-medium"
@@ -574,6 +586,16 @@ const HomePage = () => {
           </div>
         </div>
       </div>
+
+      {/* QR Code Modal */}
+      <AnimatePresence>
+        {showQRCode && shortenedUrlData && (
+          <QRCodeModal 
+            url={shortenedUrlData} 
+            onClose={() => setShowQRCode(false)} 
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -11,6 +11,7 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
     full_short_url = serializers.SerializerMethodField()
     is_expired = serializers.SerializerMethodField()
     clicks_count = serializers.SerializerMethodField()
+    qr_code_url = serializers.SerializerMethodField()
     
     class Meta:
         model = ShortenedURL
@@ -18,12 +19,12 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             'id', 'original_url', 'short_code', 'full_short_url',
             'created_at', 'last_accessed', 'expires_at', 'user',
             'access_count', 'title', 'is_custom_code', 'is_active',
-            'is_expired', 'clicks_count'
+            'is_expired', 'clicks_count', 'qr_code_url'
         ]
         read_only_fields = [
             'id', 'created_at', 'last_accessed',
             'access_count', 'full_short_url', 'is_expired',
-            'clicks_count'
+            'clicks_count', 'qr_code_url'
         ]
         extra_kwargs = {
             'user': {'required': False}
@@ -40,6 +41,10 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
     def get_clicks_count(self, obj):
         """Get the number of clicks."""
         return obj.access_count
+    
+    def get_qr_code_url(self, obj):
+        """Get the URL for the QR code."""
+        return f"{settings.URL_SHORTENER_DOMAIN}/api/qr/{obj.short_code}"
     
     def create(self, validated_data):
         """Create a new shortened URL."""

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { FiLink, FiCopy, FiTrash2, FiEdit, FiPlus, FiX, FiAlertCircle, FiCheckCircle, FiExternalLink, FiSearch, FiBarChart2, FiToggleLeft, FiToggleRight, FiCalendar, FiClock, FiEye } from 'react-icons/fi';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FiLink, FiCopy, FiTrash2, FiEdit, FiPlus, FiX, FiAlertCircle, FiCheckCircle, FiExternalLink, FiSearch, FiBarChart2, FiToggleLeft, FiToggleRight, FiCalendar, FiClock, FiEye, FiGrid } from 'react-icons/fi';
 import urlService from '../services/urlService';
+import QRCodeModal from '../components/url/QRCodeModal';
 
 const DashboardPage = () => {
   const [urls, setUrls] = useState([]);
@@ -12,6 +13,7 @@ const DashboardPage = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showExpirationModal, setShowExpirationModal] = useState(false);
+  const [showQRCodeModal, setShowQRCodeModal] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [copied, setCopied] = useState(null);
@@ -414,6 +416,12 @@ const DashboardPage = () => {
     }
   };
   
+  // Add a new handler for QR code generation
+  const handleShowQRCode = (url) => {
+    setSelectedUrl(url);
+    setShowQRCodeModal(true);
+  };
+  
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
@@ -669,6 +677,13 @@ const DashboardPage = () => {
                               title="Delete URL"
                             >
                               <FiTrash2 />
+                            </button>
+                            <button
+                              onClick={() => handleShowQRCode(url)}
+                              className="text-dark-400 hover:text-primary-600"
+                              title="Show QR Code"
+                            >
+                              <FiGrid />
                             </button>
                           </div>
                         </td>
@@ -1151,6 +1166,16 @@ const DashboardPage = () => {
           </motion.div>
         </div>
       )}
+      
+      {/* QR Code Modal */}
+      <AnimatePresence>
+        {showQRCodeModal && selectedUrl && (
+          <QRCodeModal 
+            url={selectedUrl} 
+            onClose={() => setShowQRCodeModal(false)} 
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };
