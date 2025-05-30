@@ -26,6 +26,12 @@ const urlService = {
     return response.data;
   },
   
+  // Toggle URL active status (activate/deactivate)
+  toggleUrlStatus: async (id, isActive) => {
+    const response = await api.patch(`/urls/${id}/`, { is_active: isActive });
+    return response.data;
+  },
+  
   // Delete a URL
   deleteUrl: async (id) => {
     const response = await api.delete(`/urls/${id}/`);

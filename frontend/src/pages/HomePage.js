@@ -1,15 +1,34 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { FiLink, FiCopy, FiArrowRight, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FiLink, FiCopy, FiArrowRight, FiCheckCircle, FiAlertCircle, FiSettings, FiX, FiClock, FiTag, FiCode } from 'react-icons/fi';
 import urlService from '../services/urlService';
 
 const HomePage = () => {
   const [originalUrl, setOriginalUrl] = useState('');
   const [shortenedUrl, setShortenedUrl] = useState('');
+  const [shortenedUrlData, setShortenedUrlData] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  
+  // Advanced options
+  const [customCode, setCustomCode] = useState('');
+  const [title, setTitle] = useState('');
+  const [expirationDays, setExpirationDays] = useState('');
+  
+  const validateUrl = (url) => {
+    // Simple URL validation
+    if (!url) return false;
+    
+    // Add https:// if missing
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return `https://${url}`;
+    }
+    
+    return url;
+  };
   
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,19 +39,45 @@ const HomePage = () => {
       return;
     }
     
-    if (!originalUrl.startsWith('http://') && !originalUrl.startsWith('https://')) {
-      setOriginalUrl(`https://${originalUrl}`);
+    const validatedUrl = validateUrl(originalUrl);
+    if (!validatedUrl) {
+      setError('Please enter a valid URL');
+      return;
     }
     
     setIsSubmitting(true);
     setError('');
     
     try {
-      const response = await urlService.createUrl({ original_url: originalUrl });
+      const urlData = {
+        original_url: validatedUrl
+      };
+      
+      // Add advanced options if provided
+      if (showAdvancedOptions) {
+        if (customCode) urlData.custom_code = customCode;
+        if (title) urlData.title = title;
+        if (expirationDays) urlData.expiration_days = parseInt(expirationDays, 10);
+      }
+      
+      const response = await urlService.createUrl(urlData);
       setShortenedUrl(response.full_short_url);
+      setShortenedUrlData(response);
     } catch (error) {
       console.error('Error shortening URL:', error);
-      setError(error.response?.data?.original_url?.[0] || 'Failed to shorten URL. Please try again.');
+      let errorMessage = 'Failed to shorten URL. Please try again.';
+      
+      if (error.response?.data) {
+        if (error.response.data.original_url) {
+          errorMessage = error.response.data.original_url[0];
+        } else if (error.response.data.custom_code) {
+          errorMessage = error.response.data.custom_code[0];
+        } else if (error.response.data.detail) {
+          errorMessage = error.response.data.detail;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -47,6 +92,16 @@ const HomePage = () => {
       .catch((err) => {
         console.error('Could not copy text: ', err);
       });
+  };
+  
+  // Format date
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
   
   // Animation variants
@@ -138,6 +193,87 @@ const HomePage = () => {
                       </div>
                     </div>
                     
+                    {/* Advanced Options Toggle */}
+                    <div className="flex items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                        className="text-sm text-primary-600 flex items-center focus:outline-none hover:text-primary-700"
+                      >
+                        {showAdvancedOptions ? (
+                          <>
+                            <FiX className="mr-1 h-4 w-4" /> Hide advanced options
+                          </>
+                        ) : (
+                          <>
+                            <FiSettings className="mr-1 h-4 w-4" /> Show advanced options
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    
+                    {/* Advanced Options */}
+                    <AnimatePresence>
+                      {showAdvancedOptions && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="space-y-3 border-t border-gray-200 pt-3"
+                        >
+                          <div>
+                            <label htmlFor="custom_code" className="block text-sm font-medium text-dark-700 mb-1">
+                              <FiCode className="inline mr-1" /> Custom Code (Optional)
+                            </label>
+                            <input
+                              type="text"
+                              id="custom_code"
+                              value={customCode}
+                              onChange={(e) => setCustomCode(e.target.value)}
+                              placeholder="e.g., my-link"
+                              className="input w-full py-2"
+                            />
+                            <p className="mt-1 text-xs text-dark-500">
+                              Create a custom alias for your URL (letters, numbers, and hyphens only).
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <label htmlFor="title" className="block text-sm font-medium text-dark-700 mb-1">
+                              <FiTag className="inline mr-1" /> Title (Optional)
+                            </label>
+                            <input
+                              type="text"
+                              id="title"
+                              value={title}
+                              onChange={(e) => setTitle(e.target.value)}
+                              placeholder="e.g., My awesome link"
+                              className="input w-full py-2"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label htmlFor="expiration" className="block text-sm font-medium text-dark-700 mb-1">
+                              <FiClock className="inline mr-1" /> Expiration (Optional)
+                            </label>
+                            <select
+                              id="expiration"
+                              value={expirationDays}
+                              onChange={(e) => setExpirationDays(e.target.value)}
+                              className="input w-full py-2"
+                            >
+                              <option value="">Never expires</option>
+                              <option value="1">1 day</option>
+                              <option value="7">7 days</option>
+                              <option value="30">30 days</option>
+                              <option value="90">90 days</option>
+                              <option value="365">1 year</option>
+                            </select>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    
                     {error && (
                       <div className="text-red-600 text-sm flex items-center">
                         <FiAlertCircle className="mr-1" />
@@ -149,26 +285,73 @@ const HomePage = () => {
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
-                        className="mt-4 p-3 bg-primary-50 rounded-lg flex items-center justify-between"
+                        className="mt-4 bg-primary-50 rounded-lg overflow-hidden"
                       >
-                        <span className="text-primary-800 font-medium truncate mr-2">
-                          {shortenedUrl}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={handleCopy}
-                          className="flex-shrink-0 inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-primary-700 bg-primary-100 hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                        >
-                          {copied ? (
-                            <>
-                              <FiCheckCircle className="mr-1" /> Copied!
-                            </>
-                          ) : (
-                            <>
-                              <FiCopy className="mr-1" /> Copy
-                            </>
+                        <div className="p-4 border-b border-primary-100">
+                          <div className="flex items-center justify-between">
+                            <span className="text-primary-800 font-medium">Shortened URL</span>
+                          </div>
+                        </div>
+                        
+                        <div className="p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-primary-800 font-medium truncate mr-2 text-lg">
+                              {shortenedUrl}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handleCopy}
+                              className="flex-shrink-0 inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-primary-700 bg-primary-100 hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                            >
+                              {copied ? (
+                                <>
+                                  <FiCheckCircle className="mr-1" /> Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <FiCopy className="mr-1" /> Copy
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          
+                          {shortenedUrlData && (
+                            <div className="mt-2 space-y-1 text-sm text-primary-700">
+                              <p className="truncate">
+                                <span className="font-medium">Original:</span> {shortenedUrlData.original_url}
+                              </p>
+                              {shortenedUrlData.title && (
+                                <p>
+                                  <span className="font-medium">Title:</span> {shortenedUrlData.title}
+                                </p>
+                              )}
+                              <p>
+                                <span className="font-medium">Created:</span> {formatDate(shortenedUrlData.created_at)}
+                              </p>
+                              {shortenedUrlData.expires_at && (
+                                <p>
+                                  <span className="font-medium">Expires:</span> {formatDate(shortenedUrlData.expires_at)}
+                                </p>
+                              )}
+                              <div className="pt-2">
+                                <Link
+                                  to="/login"
+                                  className="text-primary-600 hover:text-primary-800 font-medium"
+                                >
+                                  Sign in
+                                </Link>
+                                <span className="mx-2 text-primary-400">or</span>
+                                <Link
+                                  to="/register"
+                                  className="text-primary-600 hover:text-primary-800 font-medium"
+                                >
+                                  create an account
+                                </Link>
+                                <span className="text-primary-600"> to track analytics</span>
+                              </div>
+                            </div>
                           )}
-                        </button>
+                        </div>
                       </motion.div>
                     )}
                   </form>
@@ -340,4 +523,4 @@ const HomePage = () => {
   );
 };
 
-export default HomePage; 
+export default HomePage;

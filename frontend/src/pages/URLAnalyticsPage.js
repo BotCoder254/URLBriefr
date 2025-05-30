@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiArrowLeft, FiBarChart2, FiGlobe, FiClock, FiCalendar, FiCopy, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
+import { FiArrowLeft, FiBarChart2, FiGlobe, FiClock, FiCalendar, FiCopy, FiCheckCircle, FiAlertCircle, FiToggleLeft, FiToggleRight, FiSmartphone, FiMonitor, FiTablet } from 'react-icons/fi';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import urlService from '../services/urlService';
 
@@ -11,6 +11,7 @@ const URLAnalyticsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [statusToggling, setStatusToggling] = useState(false);
   
   useEffect(() => {
     const fetchAnalytics = async () => {
@@ -32,6 +33,7 @@ const URLAnalyticsPage = () => {
 
   // Format date for charts
   const formatDate = (dateStr) => {
+    if (!dateStr) return '';
     const date = new Date(dateStr);
     return `${date.getMonth() + 1}/${date.getDate()}`;
   };
@@ -52,6 +54,70 @@ const URLAnalyticsPage = () => {
       });
   };
   
+  const handleToggleStatus = async () => {
+    if (!analytics?.url) return;
+    
+    setStatusToggling(true);
+    
+    try {
+      const updatedUrl = await urlService.toggleUrlStatus(
+        analytics.url.id, 
+        !analytics.url.is_active
+      );
+      
+      // Update analytics with the new URL data
+      setAnalytics({
+        ...analytics,
+        url: updatedUrl
+      });
+    } catch (err) {
+      console.error('Error toggling URL status:', err);
+      setError('Failed to update URL status. Please try again.');
+    } finally {
+      setStatusToggling(false);
+    }
+  };
+  
+  // Check if URL is expired
+  const isExpired = (url) => {
+    if (!url || !url.expires_at) return false;
+    return new Date(url.expires_at) < new Date();
+  };
+  
+  // Process device data to handle "Unknown" devices better
+  const processDeviceData = (deviceData) => {
+    if (!deviceData || !Array.isArray(deviceData) || deviceData.length === 0) {
+      return [{ name: 'No Data', value: 1 }];
+    }
+    
+    // Map device types to more user-friendly names and icons
+    return deviceData.map(item => {
+      const deviceName = item.device || 'Unknown';
+      let displayName = deviceName;
+      
+      // For visualization, group similar devices
+      if (deviceName.toLowerCase().includes('iphone') || 
+          deviceName.toLowerCase().includes('android') ||
+          deviceName.toLowerCase().includes('mobile')) {
+        displayName = 'Mobile';
+      } else if (deviceName.toLowerCase().includes('ipad') || 
+                deviceName.toLowerCase().includes('tablet')) {
+        displayName = 'Tablet';  
+      } else if (deviceName.toLowerCase() === 'unknown' || 
+                deviceName.toLowerCase() === 'other') {
+        displayName = 'Unknown Device';
+      } else {
+        displayName = 'Desktop';
+      }
+      
+      return {
+        name: displayName,
+        value: item.count,
+        originalName: deviceName
+      };
+    });
+  };
+  
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -70,6 +136,18 @@ const URLAnalyticsPage = () => {
   
   // COLORS for charts
   const COLORS = ['#0ea5e9', '#d946ef', '#10b981', '#f97316', '#f43f5e', '#8b5cf6'];
+  
+  // Get device icon based on name
+  const getDeviceIcon = (name) => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('mobile') || lowerName.includes('phone')) {
+      return <FiSmartphone className="mr-1" />;
+    } else if (lowerName.includes('tablet') || lowerName.includes('ipad')) {
+      return <FiTablet className="mr-1" />;
+    } else {
+      return <FiMonitor className="mr-1" />;
+    }
+  };
   
   if (loading) {
     return (
@@ -127,13 +205,50 @@ const URLAnalyticsPage = () => {
                     <div className="mt-1 text-dark-500 text-sm max-w-2xl truncate">
                       Original: <a href={analytics.url.original_url} target="_blank" rel="noopener noreferrer" className="hover:text-primary-600">{analytics.url.original_url}</a>
                     </div>
+                    {analytics.url.title && (
+                      <div className="mt-1 text-dark-500 text-sm">
+                        Title: {analytics.url.title}
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-4 md:mt-0 flex flex-wrap gap-3">
+                  <div className="mt-4 md:mt-0 space-y-2">
+                    <div className="flex items-center">
+                      {analytics.url.is_active && !isExpired(analytics.url) ? (
+                        <span className="flex h-3 w-3 relative mr-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-accent-500"></span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex rounded-full h-3 w-3 bg-gray-300 mr-2"></span>
+                      )}
+                      <span className="text-sm text-dark-500">
+                        {analytics.url.is_active ? (
+                          isExpired(analytics.url) ? 'Expired' : 'Active'
+                        ) : 'Inactive'}
+                      </span>
+                      <button
+                        onClick={handleToggleStatus}
+                        disabled={statusToggling}
+                        className={`ml-2 ${analytics.url.is_active ? 'text-accent-500 hover:text-accent-700' : 'text-gray-400 hover:text-gray-600'}`}
+                        title={analytics.url.is_active ? 'Deactivate URL' : 'Activate URL'}
+                      >
+                        {statusToggling ? (
+                          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        ) : analytics.url.is_active ? (
+                          <FiToggleRight className="h-5 w-5" />
+                        ) : (
+                          <FiToggleLeft className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
                     <div className="flex items-center text-sm text-dark-500">
                       <FiCalendar className="mr-1" /> Created: {new Date(analytics.url.created_at).toLocaleDateString()}
                     </div>
                     {analytics.url.expires_at && (
-                      <div className="flex items-center text-sm text-dark-500">
+                      <div className={`flex items-center text-sm ${isExpired(analytics.url) ? 'text-red-500' : 'text-dark-500'}`}>
                         <FiClock className="mr-1" /> Expires: {new Date(analytics.url.expires_at).toLocaleDateString()}
                       </div>
                     )}
@@ -151,7 +266,7 @@ const URLAnalyticsPage = () => {
                     <div>
                       <p className="text-dark-500 text-sm font-medium">Total Clicks</p>
                       <h3 className="text-2xl font-display font-bold text-dark-900">
-                        {analytics.total_clicks}
+                        {analytics.total_clicks || 0}
                       </h3>
                     </div>
                   </div>
@@ -237,7 +352,7 @@ const URLAnalyticsPage = () => {
                         <PieChart>
                           <Pie
                             data={analytics.clicks_by_browser.map(item => ({
-                              name: item.browser || 'Unknown',
+                              name: (item.browser || 'Unknown').split(' ')[0], // Get just the browser name without version
                               value: item.count
                             }))}
                             cx="50%"
@@ -276,19 +391,30 @@ const URLAnalyticsPage = () => {
                   <div className="h-72">
                     {analytics.clicks_by_device && analytics.clicks_by_device.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={analytics.clicks_by_device.map(item => ({
-                            name: item.device || 'Unknown',
-                            clicks: item.count
-                          }))}
-                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis />
-                          <Tooltip />
-                          <Bar dataKey="clicks" fill="#0ea5e9" />
-                        </BarChart>
+                        <PieChart>
+                          <Pie
+                            data={processDeviceData(analytics.clicks_by_device)}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={70}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            paddingAngle={5}
+                            dataKey="value"
+                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          >
+                            {processDeviceData(analytics.clicks_by_device).map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            formatter={(value, name, props) => [
+                              `${value} clicks`, 
+                              props.payload.originalName || name
+                            ]} 
+                          />
+                          <Legend />
+                        </PieChart>
                       </ResponsiveContainer>
                     ) : (
                       <div className="flex h-full items-center justify-center">
@@ -309,7 +435,7 @@ const URLAnalyticsPage = () => {
                         <PieChart>
                           <Pie
                             data={analytics.clicks_by_os.map(item => ({
-                              name: item.os || 'Unknown',
+                              name: (item.os || 'Unknown').split(' ')[0], // Get just the OS name without version
                               value: item.count
                             }))}
                             cx="50%"
@@ -337,6 +463,55 @@ const URLAnalyticsPage = () => {
                   </div>
                 </div>
               </motion.div>
+              
+              {/* Device Details Table */}
+              {analytics.clicks_by_device && analytics.clicks_by_device.length > 0 && (
+                <motion.div variants={itemVariants}>
+                  <div className="bg-white rounded-xl shadow-soft p-6">
+                    <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
+                      Device Breakdown
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                              Device Type
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                              Clicks
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                              Percentage
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {analytics.clicks_by_device.map((device, index) => {
+                            const total = analytics.clicks_by_device.reduce((sum, item) => sum + item.count, 0);
+                            const percentage = ((device.count / total) * 100).toFixed(1);
+                            
+                            return (
+                              <tr key={index} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-dark-800 flex items-center">
+                                  {getDeviceIcon(device.device || 'Unknown')}
+                                  {device.device || 'Unknown'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-700">
+                                  {device.count}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-700">
+                                  {percentage}%
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
             </>
           )}
         </motion.div>
