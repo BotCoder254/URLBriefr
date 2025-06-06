@@ -25,11 +25,18 @@ const FolderSelector = ({ selectedFolder, onChange }) => {
     try {
       setLoading(true);
       const data = await urlService.getFolders();
-      setFolders(data);
+      console.log('Fetched folders in FolderSelector:', data);
+      
+      // Ensure folders is always an array
+      const validFolders = Array.isArray(data) ? data.filter(Boolean) : [];
+      console.log('Valid folders after filtering:', validFolders);
+      setFolders(validFolders);
+      
       setError(null);
     } catch (err) {
       console.error('Error fetching folders:', err);
       setError('Failed to load folders. Please try again later.');
+      setFolders([]);
     } finally {
       setLoading(false);
     }

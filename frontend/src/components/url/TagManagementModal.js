@@ -63,7 +63,11 @@ const TagManagementModal = ({ isOpen, onClose }) => {
       setNewTagColor('#3B82F6');
     } catch (err) {
       console.error('Error creating tag:', err);
-      setError('Failed to create tag. Please try again.');
+      if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      } else {
+        setError('Failed to create tag. Please try again.');
+      }
     }
   };
   
@@ -200,6 +204,7 @@ const TagManagementModal = ({ isOpen, onClose }) => {
                         className="input py-1 px-2 text-sm flex-grow"
                         autoFocus
                       />
+                      
                       <div className="relative">
                         <input
                           type="color"
@@ -208,6 +213,20 @@ const TagManagementModal = ({ isOpen, onClose }) => {
                           className="w-6 h-6 cursor-pointer rounded-full overflow-hidden"
                         />
                       </div>
+                      
+                      <div className="flex space-x-1">
+                        {tagColors.map(color => (
+                          <div
+                            key={color}
+                            onClick={() => setEditingTag({...editingTag, color})}
+                            className={`w-4 h-4 rounded-full cursor-pointer ${
+                              editingTag.color === color ? 'ring-2 ring-offset-1 ring-gray-400' : ''
+                            }`}
+                            style={{ backgroundColor: color }}
+                          ></div>
+                        ))}
+                      </div>
+                      
                       <button
                         type="submit"
                         className="p-1 text-green-600 hover:text-green-800"
@@ -225,7 +244,7 @@ const TagManagementModal = ({ isOpen, onClose }) => {
                   ) : (
                     <>
                       <div className="flex items-center">
-                        <div 
+                        <div
                           className="w-4 h-4 rounded-full mr-2"
                           style={{ backgroundColor: tag.color }}
                         ></div>
@@ -249,7 +268,7 @@ const TagManagementModal = ({ isOpen, onClose }) => {
                               handleDeleteTag(tag.id);
                             }
                           }}
-                          className="p-1 text-gray-500 hover:text-red-600"
+                          className="p-1 text-gray-500 hover:text-red-600 flex items-center"
                           title="Delete tag"
                         >
                           <FiTrash2 className="h-4 w-4" />

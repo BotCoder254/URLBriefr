@@ -324,10 +324,21 @@ const urlService = {
   getFolders: async () => {
     try {
       const response = await api.get('/urls/folders/');
-      return response.data;
+      console.log('Folders API response:', response.data);
+      
+      // Ensure we always return an array, even if the response is null or undefined
+      if (!response.data || !Array.isArray(response.data)) {
+        console.warn('Folders API returned invalid data:', response.data);
+        return [];
+      }
+      
+      // Filter out any null, undefined, or empty string values
+      const validFolders = response.data.filter(folder => folder && folder.trim() !== '');
+      return validFolders;
     } catch (error) {
       console.error('Error getting folders:', error.response?.data || error.message);
-      throw error;
+      // Return empty array instead of throwing to prevent UI errors
+      return [];
     }
   }
 };

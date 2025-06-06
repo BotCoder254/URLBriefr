@@ -3,8 +3,8 @@ from rest_framework import viewsets, permissions, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view, permission_classes
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import ShortenedURL, Tag
-from .serializers import ShortenedURLSerializer, CreateShortenedURLSerializer, TagSerializer
+from .models import ShortenedURL, Tag, ABTestVariant
+from .serializers import ShortenedURLSerializer, CreateShortenedURLSerializer, TagSerializer, ABTestVariantSerializer
 from analytics.models import ClickEvent
 from django.http import HttpResponseRedirect, HttpResponse
 from django.utils import timezone
@@ -16,6 +16,11 @@ from django.conf import settings
 import base64
 import requests
 import random
+from django.db.models import Count, Q
+
+# Constants for user limits
+MAX_FOLDERS_PER_USER = 5
+MAX_TAGS_PER_USER = 10
 
 
 class TagViewSet(viewsets.ModelViewSet):
@@ -34,6 +39,21 @@ class TagViewSet(viewsets.ModelViewSet):
         urls = tag.urls.all()
         serializer = ShortenedURLSerializer(urls, many=True, context={'request': request})
         return Response(serializer.data)
+    
+    def create(self, request, *args, **kwargs):
+        """Create a new tag with limit check."""
+        # Count user's existing tags
+        user = request.user
+        tag_count = Tag.objects.filter(user=user).count()
+        
+        # Check if user has reached the tag limit
+        if tag_count >= MAX_TAGS_PER_USER:
+            return Response(
+                {"error": f"You have reached the maximum limit of {MAX_TAGS_PER_USER} tags. Please delete some tags before creating new ones."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        return super().create(request, *args, **kwargs)
 
 
 class ShortenedURLViewSet(viewsets.ModelViewSet):
@@ -57,22 +77,29 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
         # Authenticated users can see their own URLs
         elif user.is_authenticated:
             queryset = ShortenedURL.objects.filter(user=user)
+            
+            # Apply filters from query parameters
+            folder = self.request.query_params.get('folder', None)
+            if folder is not None:
+                queryset = queryset.filter(folder=folder)
+            
+            tag_ids = self.request.query_params.getlist('tag_id', None)
+            if tag_ids:
+                queryset = queryset.filter(tags__id__in=tag_ids).distinct()
+            
+            search = self.request.query_params.get('search', None)
+            if search:
+                queryset = queryset.filter(
+                    Q(original_url__icontains=search) | 
+                    Q(short_code__icontains=search) |
+                    Q(title__icontains=search)
+                )
+            
+            return queryset.order_by('-created_at')
         
         # Guest users can't see any URLs through API
         else:
             return ShortenedURL.objects.none()
-        
-        # Filter by tags if provided
-        tags = self.request.query_params.getlist('tag')
-        if tags:
-            queryset = queryset.filter(tags__name__in=tags).distinct()
-        
-        # Filter by tag_ids if provided
-        tag_ids = self.request.query_params.getlist('tag_id')
-        if tag_ids:
-            queryset = queryset.filter(tags__id__in=tag_ids).distinct()
-            
-        return queryset
     
     def get_permissions(self):
         """Get permissions based on action."""
@@ -111,14 +138,51 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
         if not user.is_authenticated:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
         
-        folders = ShortenedURL.objects.filter(
-            user=user,
-            folder__isnull=False
+        # Get all folders for this user - ensure we get non-empty folders
+        folders_query = ShortenedURL.objects.filter(
+            user=user
+        ).exclude(
+            folder__isnull=True
         ).exclude(
             folder=''
         ).values_list('folder', flat=True).distinct()
         
-        return Response(list(folders))
+        # Convert to list and ensure it's not empty
+        folder_list = list(folders_query)
+        print(f"Found {len(folder_list)} folders for user {user.email}: {folder_list}")
+        
+        # Ensure we never return None
+        if folder_list is None:
+            folder_list = []
+            
+        return Response(folder_list)
+    
+    def create(self, request, *args, **kwargs):
+        """Create a new shortened URL."""
+        # Check folder limit if user is authenticated and folder is provided
+        user = request.user
+        if user.is_authenticated and 'folder' in request.data and request.data['folder']:
+            # Skip validation for temporary URL for folder creation
+            if request.data.get('title') != 'Temporary URL for folder creation':
+                # Count unique folders for this user
+                folder_count = ShortenedURL.objects.filter(
+                    user=user
+                ).exclude(folder__isnull=True).exclude(folder='').values('folder').distinct().count()
+                
+                # Check if the folder already exists for this user
+                folder_exists = ShortenedURL.objects.filter(
+                    user=user, 
+                    folder=request.data['folder']
+                ).exists()
+                
+                # If it's a new folder and the user has reached the limit
+                if not folder_exists and folder_count >= MAX_FOLDERS_PER_USER:
+                    return Response(
+                        {"error": f"You have reached the maximum limit of {MAX_FOLDERS_PER_USER} folders. Please delete some folders before creating new ones."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+        
+        return super().create(request, *args, **kwargs)
 
 
 @api_view(['GET'])

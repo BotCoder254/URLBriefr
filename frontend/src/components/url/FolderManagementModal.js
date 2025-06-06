@@ -21,13 +21,18 @@ const FolderManagementModal = ({ isOpen, onClose }) => {
     try {
       setLoading(true);
       const data = await urlService.getFolders();
-      setFolders(data);
+      console.log('Fetched folders in FolderManagementModal:', data);
+      
+      // Ensure folders is always an array
+      const validFolders = Array.isArray(data) ? data.filter(Boolean) : [];
+      console.log('Valid folders after filtering:', validFolders);
+      setFolders(validFolders);
       
       // Get URL counts for each folder
       const urls = await urlService.getUserUrls();
       const counts = {};
       
-      data.forEach(folder => {
+      validFolders.forEach(folder => {
         counts[folder] = urls.filter(url => url.folder === folder).length;
       });
       
@@ -36,6 +41,7 @@ const FolderManagementModal = ({ isOpen, onClose }) => {
     } catch (err) {
       console.error('Error fetching folders:', err);
       setError('Failed to load folders. Please try again later.');
+      setFolders([]);
     } finally {
       setLoading(false);
     }
@@ -49,6 +55,7 @@ const FolderManagementModal = ({ isOpen, onClose }) => {
     }
     
     const folderName = newFolderName.trim();
+    console.log('Attempting to create folder:', folderName);
     
     // Check if folder already exists
     if (folders.includes(folderName)) {
@@ -65,11 +72,19 @@ const FolderManagementModal = ({ isOpen, onClose }) => {
         is_active: false
       };
       
+      console.log('Creating folder with payload:', folderPayload);
+      
       // Create a URL with the new folder name
       const response = await urlService.createUrl(folderPayload);
+      console.log('Folder creation response:', response);
       
       // If successful, update the local state to include the new folder
-      setFolders(prevFolders => [...prevFolders, folderName]);
+      setFolders(prevFolders => {
+        const updatedFolders = [...prevFolders, folderName];
+        console.log('Updated folders list:', updatedFolders);
+        return updatedFolders;
+      });
+      
       setFolderCounts(prevCounts => ({...prevCounts, [folderName]: 0}));
       setNewFolderName('');
       setError(null);
@@ -85,7 +100,11 @@ const FolderManagementModal = ({ isOpen, onClose }) => {
       }
     } catch (err) {
       console.error('Error creating folder:', err);
-      setError('Failed to create folder. Please try again.');
+      if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      } else {
+        setError('Failed to create folder. Please try again.');
+      }
     }
   };
   
@@ -294,7 +313,7 @@ const FolderManagementModal = ({ isOpen, onClose }) => {
                               handleDeleteFolder(folder);
                             }
                           }}
-                          className="p-1 text-gray-500 hover:text-red-600"
+                          className="p-1 text-gray-500 hover:text-red-600 flex items-center"
                           title="Delete folder"
                         >
                           <FiTrash2 className="h-4 w-4" />

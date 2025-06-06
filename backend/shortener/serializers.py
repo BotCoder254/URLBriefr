@@ -100,6 +100,16 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
         """Get the URL for the QR code."""
         return f"{settings.URL_SHORTENER_DOMAIN}/api/qr/{obj.short_code}"
     
+    def to_representation(self, instance):
+        """Custom representation to handle RelatedManager objects."""
+        representation = super().to_representation(instance)
+        
+        # Ensure tags are properly serialized
+        if 'tags' in representation and representation['tags'] is None:
+            representation['tags'] = []
+            
+        return representation
+    
     def create(self, validated_data):
         """Create a new shortened URL."""
         user = self.context['request'].user
@@ -180,7 +190,13 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
             'is_active', 'is_ab_test', 'variants', 'tag_ids',
             'new_tags', 'folder'
         ]
-        
+    
+    def to_representation(self, instance):
+        """Custom representation to handle RelatedManager objects."""
+        # Use the ShortenedURLSerializer for the output representation
+        serializer = ShortenedURLSerializer(instance, context=self.context)
+        return serializer.data
+
     def validate(self, data):
         """Validate expiration settings."""
         expiration_type = data.get('expiration_type', 'none')

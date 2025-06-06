@@ -42,7 +42,12 @@ const OrganizePage = () => {
       
       // Fetch folders
       const foldersData = await urlService.getFolders();
-      setFolders(foldersData);
+      console.log('Fetched folders in OrganizePage:', foldersData);
+      
+      // Ensure folders is always an array
+      const validFolders = Array.isArray(foldersData) ? foldersData.filter(Boolean) : [];
+      console.log('Valid folders after filtering:', validFolders);
+      setFolders(validFolders);
       
       // Fetch all URLs
       const urlsData = await urlService.getUserUrls();
