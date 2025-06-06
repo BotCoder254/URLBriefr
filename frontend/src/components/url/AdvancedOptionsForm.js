@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FiChevronDown, FiChevronUp, FiCalendar, FiClock, FiCheck, FiX, FiExternalLink } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiCalendar, FiClock, FiCheck, FiX, FiExternalLink, FiLock, FiShield, FiAlertTriangle } from 'react-icons/fi';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
 const AdvancedOptionsForm = ({ formData, setFormData }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isRedirectExpanded, setIsRedirectExpanded] = useState(false);
+  const [isSecurityExpanded, setIsSecurityExpanded] = useState(false);
+  const [isSelfDestructExpanded, setIsSelfDestructExpanded] = useState(false);
   
   const handleExpirationTypeChange = (type) => {
     setFormData({
@@ -29,6 +31,21 @@ const AdvancedOptionsForm = ({ formData, setFormData }) => {
     setFormData({
       ...formData,
       redirect_page_type: type
+    });
+  };
+  
+  const handleEncryptionToggle = (isEncrypted) => {
+    setFormData({
+      ...formData,
+      is_encrypted: isEncrypted
+    });
+  };
+  
+  const handleSelfDestructToggle = (selfDestruct) => {
+    setFormData({
+      ...formData,
+      self_destruct: selfDestruct,
+      max_clicks: selfDestruct ? (formData.max_clicks || 10) : null
     });
   };
   
@@ -121,6 +138,138 @@ const AdvancedOptionsForm = ({ formData, setFormData }) => {
                   className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500"
                 />
               </div>
+            )}
+          </div>
+          
+          {/* Self-destructing link settings */}
+          <div className="space-y-3 pt-4 border-t border-gray-200">
+            <div 
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setIsSelfDestructExpanded(!isSelfDestructExpanded)}
+            >
+              <h4 className="text-md font-medium text-dark-800">Self-Destructing Link</h4>
+              {isSelfDestructExpanded ? <FiChevronUp /> : <FiChevronDown />}
+            </div>
+            
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                className={`px-4 py-2 rounded-md border flex items-center ${
+                  !formData.self_destruct
+                    ? 'border-primary-600 bg-primary-50 text-primary-700'
+                    : 'border-gray-300 text-dark-500 hover:bg-gray-50'
+                }`}
+                onClick={() => handleSelfDestructToggle(false)}
+              >
+                {!formData.self_destruct && <FiCheck className="mr-1" />}
+                Standard link
+              </button>
+              
+              <button
+                type="button"
+                className={`px-4 py-2 rounded-md border flex items-center ${
+                  formData.self_destruct
+                    ? 'border-primary-600 bg-primary-50 text-primary-700'
+                    : 'border-gray-300 text-dark-500 hover:bg-gray-50'
+                }`}
+                onClick={() => handleSelfDestructToggle(true)}
+              >
+                {formData.self_destruct && <FiCheck className="mr-1" />}
+                <FiAlertTriangle className="mr-1" /> Self-destructing
+              </button>
+            </div>
+            
+            {formData.self_destruct && isSelfDestructExpanded && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="space-y-4 mt-3 pl-3 border-l-2 border-gray-100"
+              >
+                <div className="space-y-2">
+                  <label htmlFor="max_clicks" className="block text-sm font-medium text-dark-700">
+                    Maximum Clicks Before Self-Destruction
+                  </label>
+                  <input
+                    type="range"
+                    id="max_clicks"
+                    min="1"
+                    max="100"
+                    value={formData.max_clicks || 10}
+                    onChange={(e) => setFormData({ ...formData, max_clicks: parseInt(e.target.value) })}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-dark-500">
+                    <span>1 click</span>
+                    <span>{formData.max_clicks || 10} clicks</span>
+                    <span>100 clicks</span>
+                  </div>
+                  <p className="text-xs text-dark-500 mt-2">
+                    <FiAlertTriangle className="inline-block mr-1 text-amber-500" />
+                    After {formData.max_clicks || 10} clicks, this link will automatically self-destruct and become inaccessible.
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </div>
+          
+          {/* End-to-End Encryption settings */}
+          <div className="space-y-3 pt-4 border-t border-gray-200">
+            <div 
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setIsSecurityExpanded(!isSecurityExpanded)}
+            >
+              <h4 className="text-md font-medium text-dark-800">Security & Privacy</h4>
+              {isSecurityExpanded ? <FiChevronUp /> : <FiChevronDown />}
+            </div>
+            
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                className={`px-4 py-2 rounded-md border flex items-center ${
+                  !formData.is_encrypted
+                    ? 'border-primary-600 bg-primary-50 text-primary-700'
+                    : 'border-gray-300 text-dark-500 hover:bg-gray-50'
+                }`}
+                onClick={() => handleEncryptionToggle(false)}
+              >
+                {!formData.is_encrypted && <FiCheck className="mr-1" />}
+                Standard
+              </button>
+              
+              <button
+                type="button"
+                className={`px-4 py-2 rounded-md border flex items-center ${
+                  formData.is_encrypted
+                    ? 'border-primary-600 bg-primary-50 text-primary-700'
+                    : 'border-gray-300 text-dark-500 hover:bg-gray-50'
+                }`}
+                onClick={() => handleEncryptionToggle(true)}
+              >
+                {formData.is_encrypted && <FiCheck className="mr-1" />}
+                <FiLock className="mr-1" /> End-to-End Encrypted
+              </button>
+            </div>
+            
+            {formData.is_encrypted && isSecurityExpanded && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-3 pl-3 border-l-2 border-gray-100"
+              >
+                <div className="bg-green-50 p-3 rounded-md border border-green-100">
+                  <div className="flex items-start">
+                    <FiShield className="text-green-600 mt-1 mr-2 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm text-green-800 font-medium">End-to-End Encryption Enabled</p>
+                      <p className="text-xs text-green-700 mt-1">
+                        The destination URL will be encrypted and only visible to you. This adds an extra layer of privacy and security.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
             )}
           </div>
           

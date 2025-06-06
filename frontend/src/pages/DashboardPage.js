@@ -44,7 +44,10 @@ const DashboardPage = () => {
       { name: 'Variant B', destination_url: '', weight: 50 }
     ],
     folder: '',
-    tag_ids: []
+    tag_ids: [],
+    is_encrypted: false,
+    self_destruct: false,
+    max_clicks: 10
   });
   
   // Expiration form state
@@ -206,7 +209,10 @@ const DashboardPage = () => {
           { name: 'Variant B', destination_url: '', weight: 50 }
         ],
         folder: '',
-        tag_ids: []
+        tag_ids: [],
+        is_encrypted: false,
+        self_destruct: false,
+        max_clicks: 10
       });
       
       setCreateSuccess(true);
@@ -545,18 +551,18 @@ const DashboardPage = () => {
         >
           <motion.div variants={itemVariants} className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-display font-bold text-dark-900">URL Dashboard</h1>
+              <h1 className="text-3xl font-display font-bold text-dark-900">Dashboard</h1>
               <p className="mt-2 text-dark-500">
-                Manage all your shortened URLs in one place
+                Manage your shortened URLs and view analytics
               </p>
             </div>
             <div className="flex space-x-3">
               <Link
-                to="/organize"
+                to="/self-destruct"
                 className="btn btn-outline flex items-center space-x-2"
               >
-                <FiTag />
-                <span>Organize</span>
+                <FiAlertCircle />
+                <span>Self-Destruct Dashboard</span>
               </Link>
               <button
                 onClick={() => setShowCreateModal(true)}
@@ -938,243 +944,208 @@ const DashboardPage = () => {
       </div>
       
       {/* Create URL Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-dark-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <AnimatePresence>
+        {showCreateModal && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-xl shadow-soft p-6 max-w-lg w-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
           >
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-display font-semibold text-dark-900">Create New URL</h2>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-dark-400 hover:text-dark-600"
-              >
-                <FiX className="h-5 w-5" />
-              </button>
-            </div>
-            
-            {createSuccess ? (
-              <div className="bg-accent-50 text-accent-800 p-4 rounded-lg mb-4 flex items-center">
-                <FiCheckCircle className="mr-2 text-accent-600" />
-                URL created successfully!
-              </div>
-            ) : (
-              <form onSubmit={handleCreateUrl} className="space-y-4">
-                {formErrors.submit && (
-                  <div className="bg-red-50 text-red-700 p-3 rounded-lg flex items-start">
-                    <FiAlertCircle className="mr-2 mt-0.5 flex-shrink-0" />
-                    <span>{formErrors.submit}</span>
-                  </div>
-                )}
-                
-                <div>
-                  <label htmlFor="original_url" className="label">URL to Shorten *</label>
-                  <input
-                    id="original_url"
-                    name="original_url"
-                    type="text"
-                    value={newUrl.original_url}
-                    onChange={handleFormChange}
-                    className={`input w-full ${formErrors.original_url ? 'border-red-500' : ''}`}
-                    placeholder="https://example.com/very/long/url"
-                  />
-                  {formErrors.original_url && (
-                    <p className="mt-1 text-sm text-red-600">{formErrors.original_url}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <label htmlFor="custom_code" className="label">Custom Code (Optional)</label>
-                  <input
-                    id="custom_code"
-                    name="custom_code"
-                    type="text"
-                    value={newUrl.custom_code}
-                    onChange={handleFormChange}
-                    className="input w-full"
-                    placeholder="my-custom-url"
-                  />
-                  <p className="mt-1 text-xs text-dark-500">
-                    Leave blank to generate a random code.
-                  </p>
-                </div>
-                
-                <div>
-                  <label htmlFor="title" className="label">Title (Optional)</label>
-                  <input
-                    id="title"
-                    name="title"
-                    type="text"
-                    value={newUrl.title}
-                    onChange={handleFormChange}
-                    className="input w-full"
-                    placeholder="My awesome link"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="expiration_days" className="label">Expires After (Optional)</label>
-                  <select
-                    id="expiration_days"
-                    name="expiration_days"
-                    value={newUrl.expiration_days}
-                    onChange={handleFormChange}
-                    className="input w-full"
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            >
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-display font-bold text-dark-900">Create New URL</h2>
+                  <button
+                    onClick={() => setShowCreateModal(false)}
+                    className="text-dark-400 hover:text-dark-600"
                   >
-                    <option value="">Never expires</option>
-                    <option value="1">1 day</option>
-                    <option value="7">7 days</option>
-                    <option value="30">30 days</option>
-                    <option value="90">90 days</option>
-                    <option value="365">1 year</option>
-                  </select>
+                    <FiX className="h-6 w-6" />
+                  </button>
                 </div>
                 
-                <div className="flex items-center">
-                  <input
-                    id="is_active"
-                    name="is_active"
-                    type="checkbox"
-                    checked={newUrl.is_active}
-                    onChange={handleFormChange}
-                    className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                  />
-                  <label htmlFor="is_active" className="ml-2 block text-sm text-dark-700">
-                    Active (URL is immediately accessible)
-                  </label>
-                </div>
-                
-                <div className="flex items-center">
-                  <input
-                    id="is_ab_test"
-                    name="is_ab_test"
-                    type="checkbox"
-                    checked={newUrl.is_ab_test}
-                    onChange={handleFormChange}
-                    className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                  />
-                  <label htmlFor="is_ab_test" className="ml-2 block text-sm text-dark-700">
-                    Enable A/B Testing
-                  </label>
-                </div>
-                
-                {/* A/B Testing Form */}
-                <AnimatePresence>
-                  {newUrl.is_ab_test && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="mt-4 pt-3 border-t border-gray-200"
-                      style={{ overflow: 'visible' }}
-                    >
-                      {formErrors.variants && (
-                        <div className="mb-3 bg-red-50 text-red-700 p-2 rounded-lg text-sm">
-                          <FiAlertCircle className="inline mr-1" /> {formErrors.variants}
-                        </div>
-                      )}
-                      <ABTestingForm 
-                        variants={newUrl.variants} 
-                        setVariants={(updatedVariants) => {
-                          setNewUrl(prev => ({
-                            ...prev,
-                            variants: updatedVariants
-                          }));
-                        }} 
+                <form onSubmit={handleCreateUrl} className="space-y-6">
+                  {/* Original URL */}
+                  <div>
+                    <label htmlFor="original_url" className="block text-sm font-medium text-dark-700">
+                      URL to shorten *
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        type="text"
+                        name="original_url"
+                        id="original_url"
+                        value={newUrl.original_url}
+                        onChange={handleFormChange}
+                        placeholder="https://example.com/long-url-to-shorten"
+                        className={`input w-full ${formErrors.original_url ? 'border-red-500' : ''}`}
                       />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                
-                {/* Organization section */}
-                <div className="mt-4 pt-3 border-t border-gray-200">
-                  <h3 className="text-md font-medium text-dark-800 mb-3">Organization</h3>
+                      {formErrors.original_url && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.original_url}</p>
+                      )}
+                    </div>
+                  </div>
                   
-                  <div className="space-y-3">
-                    {/* Folder selection */}
+                  {/* URL Title */}
+                  <div>
+                    <label htmlFor="title" className="block text-sm font-medium text-dark-700">
+                      Title (optional)
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        type="text"
+                        name="title"
+                        id="title"
+                        value={newUrl.title}
+                        onChange={handleFormChange}
+                        placeholder="My awesome link"
+                        className="input w-full"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Custom Code */}
+                  <div>
+                    <label htmlFor="custom_code" className="block text-sm font-medium text-dark-700">
+                      Custom Short Code (optional)
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        type="text"
+                        name="custom_code"
+                        id="custom_code"
+                        value={newUrl.custom_code}
+                        onChange={handleFormChange}
+                        placeholder="my-custom-code"
+                        className="input w-full"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Organization */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="block text-xs font-medium text-dark-700">
-                          <FiFolder className="inline mr-1" /> Folder (Optional)
-                        </label>
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            // Save current form state and open folder management modal
+                      <label className="block text-sm font-medium text-dark-700">
+                        Folder (optional)
+                      </label>
+                      <div className="mt-1">
+                        <FolderSelector
+                          selectedFolder={newUrl.folder}
+                          onChange={(folder) => setNewUrl({ ...newUrl, folder })}
+                          onManageFolders={() => {
+                            setShowCreateModal(false);
                             setShowFolderManagementModal(true);
                           }}
-                          className="text-xs text-primary-600 hover:text-primary-700 flex items-center"
-                        >
-                          <FiSettings className="mr-1 h-3 w-3" /> Manage
-                        </button>
+                        />
                       </div>
-                      <FolderSelector
-                        selectedFolder={newUrl.folder}
-                        onChange={(folder) => setNewUrl(prev => ({ ...prev, folder }))}
-                      />
                     </div>
                     
-                    {/* Tags selection */}
                     <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="block text-xs font-medium text-dark-700">
-                          <FiTag className="inline mr-1" /> Tags (Optional)
-                        </label>
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            // Save current form state and open tag management modal
+                      <label className="block text-sm font-medium text-dark-700">
+                        Tags (optional)
+                      </label>
+                      <div className="mt-1">
+                        <TagSelector
+                          selectedTags={newUrl.tag_ids}
+                          onChange={(tags) => setNewUrl({ ...newUrl, tag_ids: tags })}
+                          onManageTags={() => {
+                            setShowCreateModal(false);
                             setShowTagManagementModal(true);
                           }}
-                          className="text-xs text-primary-600 hover:text-primary-700 flex items-center"
-                        >
-                          <FiSettings className="mr-1 h-3 w-3" /> Manage
-                        </button>
+                        />
                       </div>
-                      <TagSelector
-                        selectedTags={newUrl.tag_ids}
-                        onChange={(tags) => setNewUrl(prev => ({ ...prev, tag_ids: tags }))}
-                      />
                     </div>
                   </div>
-                </div>
-                
-                {/* Advanced options */}
-                <AdvancedOptionsForm formData={newUrl} setFormData={(updatedData) => setNewUrl(updatedData)} />
-                
-                <div className="flex justify-end space-x-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    className="btn btn-outline"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="btn btn-primary"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Creating...
-                      </>
-                    ) : (
-                      'Create URL'
+                  
+                  {/* A/B Testing Toggle */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-medium text-dark-800">A/B Testing</h3>
+                        <p className="text-sm text-dark-500">Test multiple destination URLs</p>
+                      </div>
+                      <button
+                        type="button"
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          newUrl.is_ab_test ? 'bg-primary-600' : 'bg-gray-200'
+                        }`}
+                        onClick={() => setNewUrl({ ...newUrl, is_ab_test: !newUrl.is_ab_test })}
+                      >
+                        <span className="sr-only">Toggle A/B Testing</span>
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            newUrl.is_ab_test ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    
+                    {newUrl.is_ab_test && (
+                      <div className="mt-4">
+                        <ABTestingForm
+                          variants={newUrl.variants}
+                          onChange={(variants) => setNewUrl({ ...newUrl, variants })}
+                        />
+                        {formErrors.variants && (
+                          <p className="mt-1 text-sm text-red-600">{formErrors.variants}</p>
+                        )}
+                      </div>
                     )}
-                  </button>
-                </div>
-              </form>
-            )}
+                  </div>
+                  
+                  {/* Advanced Options */}
+                  <AdvancedOptionsForm formData={newUrl} setFormData={setNewUrl} />
+                  
+                  {/* Submit Button */}
+                  <div className="flex justify-end space-x-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateModal(false)}
+                      className="btn btn-outline"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="btn btn-primary"
+                    >
+                      {isSubmitting ? 'Creating...' : 'Create URL'}
+                    </button>
+                  </div>
+                  
+                  {/* Success Message */}
+                  {createSuccess && (
+                    <div className="mt-4 p-4 bg-accent-50 text-accent-700 rounded-md flex items-start">
+                      <FiCheckCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium">URL created successfully!</p>
+                        <p className="text-sm mt-1">Your new shortened URL is ready to use.</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Error Message */}
+                  {Object.keys(formErrors).length > 0 && !formErrors.original_url && !formErrors.variants && (
+                    <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-md flex items-start">
+                      <FiAlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium">There was an error creating your URL</p>
+                        <p className="text-sm mt-1">Please check the form and try again.</p>
+                      </div>
+                    </div>
+                  )}
+                </form>
+              </div>
+            </motion.div>
           </motion.div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
       
       {/* Delete Confirmation Modal */}
       {showDeleteModal && selectedUrl && (

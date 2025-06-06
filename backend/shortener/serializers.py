@@ -64,22 +64,26 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
+    original_url_decrypted = serializers.SerializerMethodField()
+    remaining_clicks = serializers.SerializerMethodField()
     
     class Meta:
         model = ShortenedURL
         fields = [
-            'id', 'original_url', 'short_code', 'full_short_url',
+            'id', 'original_url', 'original_url_decrypted', 'short_code', 'full_short_url',
             'created_at', 'last_accessed', 'expires_at', 'user',
             'access_count', 'title', 'is_custom_code', 'is_active',
             'is_expired', 'clicks_count', 'qr_code_url', 'is_ab_test',
             'variants', 'tags', 'tag_ids', 'folder',
             'use_redirect_page', 'redirect_page_type', 'redirect_delay',
-            'custom_redirect_message', 'brand_name', 'brand_logo_url'
+            'custom_redirect_message', 'brand_name', 'brand_logo_url',
+            'is_encrypted', 'self_destruct', 'max_clicks', 'remaining_clicks'
         ]
         read_only_fields = [
             'id', 'created_at', 'last_accessed',
             'access_count', 'full_short_url', 'is_expired',
-            'clicks_count', 'qr_code_url'
+            'clicks_count', 'qr_code_url', 'original_url_decrypted',
+            'remaining_clicks'
         ]
         extra_kwargs = {
             'user': {'required': False},
@@ -89,7 +93,10 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             'redirect_delay': {'required': False},
             'custom_redirect_message': {'required': False},
             'brand_name': {'required': False},
-            'brand_logo_url': {'required': False}
+            'brand_logo_url': {'required': False},
+            'is_encrypted': {'required': False},
+            'self_destruct': {'required': False},
+            'max_clicks': {'required': False}
         }
     
     def get_full_short_url(self, obj):
@@ -107,6 +114,22 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
     def get_qr_code_url(self, obj):
         """Get the URL for the QR code."""
         return f"{settings.URL_SHORTENER_DOMAIN}/api/qr/{obj.short_code}"
+    
+    def get_original_url_decrypted(self, obj):
+        """Get the decrypted original URL if it's encrypted."""
+        if obj.is_encrypted:
+            # Only return the decrypted URL if the user is the owner
+            request = self.context.get('request')
+            if request and request.user == obj.user:
+                return obj.get_decrypted_url()
+            return None
+        return obj.original_url
+    
+    def get_remaining_clicks(self, obj):
+        """Get the number of clicks remaining before self-destruction."""
+        if obj.self_destruct and obj.max_clicks:
+            return max(0, obj.max_clicks - obj.access_count)
+        return None
     
     def to_representation(self, instance):
         """Custom representation to handle RelatedManager objects."""
@@ -202,6 +225,13 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
     brand_name = serializers.CharField(required=False, allow_blank=True, max_length=100)
     brand_logo_url = serializers.URLField(required=False, allow_blank=True, max_length=2000)
     
+    # End-to-End Encryption fields
+    is_encrypted = serializers.BooleanField(required=False, default=False)
+    
+    # Self-destructing link fields
+    self_destruct = serializers.BooleanField(required=False, default=False)
+    max_clicks = serializers.IntegerField(required=False, min_value=1, max_value=1000)
+    
     class Meta:
         model = ShortenedURL
         fields = [
@@ -210,7 +240,8 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
             'is_active', 'is_ab_test', 'variants', 'tag_ids',
             'new_tags', 'folder',
             'use_redirect_page', 'redirect_page_type', 'redirect_delay',
-            'custom_redirect_message', 'brand_name', 'brand_logo_url'
+            'custom_redirect_message', 'brand_name', 'brand_logo_url',
+            'is_encrypted', 'self_destruct', 'max_clicks'
         ]
     
     def to_representation(self, instance):

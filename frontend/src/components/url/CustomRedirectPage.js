@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FiArrowRight, FiExternalLink, FiLink, FiCopy, FiCheckCircle } from 'react-icons/fi';
+import { FiArrowRight, FiExternalLink, FiLink, FiCopy, FiCheckCircle, FiAlertTriangle } from 'react-icons/fi';
 import RocketAnimation from './animations/RocketAnimation';
 import WorkingAnimation from './animations/WorkingAnimation';
 import DiggingAnimation from './animations/DiggingAnimation';
@@ -47,7 +47,7 @@ const CustomRedirectPage = ({ destinationUrl, settings }) => {
   
   // Render the appropriate animation based on page type
   const renderAnimation = () => {
-    switch (settings.page_type) {
+    switch (settings.type) {
       case 'rocket':
         return <RocketAnimation />;
       case 'working':
@@ -100,6 +100,25 @@ const CustomRedirectPage = ({ destinationUrl, settings }) => {
               {settings.message || "Redirecting to your destination..."}
             </p>
           </div>
+          
+          {/* Self-destruct warning */}
+          {settings.self_destruct && settings.remaining_clicks !== null && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6"
+            >
+              <div className="flex items-start">
+                <FiAlertTriangle className="text-amber-500 mt-1 mr-2 flex-shrink-0" />
+                <div>
+                  <p className="text-amber-800 font-medium">Self-Destructing Link</p>
+                  <p className="text-sm text-amber-700 mt-1">
+                    This link will self-destruct after {settings.remaining_clicks} more {settings.remaining_clicks === 1 ? 'click' : 'clicks'}.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
           
           {/* Animation */}
           {renderAnimation()}

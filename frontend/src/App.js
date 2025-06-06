@@ -20,6 +20,7 @@ import NotFoundPage from './pages/NotFoundPage';
 import RedirectPage from './pages/RedirectPage';
 import ABTestingPage from './pages/ABTestingPage';
 import OrganizePage from './pages/OrganizePage';
+import SelfDestructDashboard from './pages/SelfDestructDashboard';
 
 function App() {
   return (
@@ -85,6 +86,17 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <ABTestingPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/self-destruct"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <SelfDestructDashboard />
                 </Layout>
               </ProtectedRoute>
             }

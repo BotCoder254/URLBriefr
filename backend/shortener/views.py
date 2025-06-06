@@ -214,6 +214,24 @@ def redirect_to_original(request, short_code):
             }
         }, status=status.HTTP_404_NOT_FOUND)
     
+    # Check if URL should self-destruct
+    if url.should_self_destruct():
+        url.is_active = False
+        url.save(update_fields=['is_active'])
+        
+        return Response({
+            'error': 'This URL has self-destructed after reaching its maximum click count.',
+            'status': 'error',
+            'reason': 'self_destructed',
+            'url_info': {
+                'short_code': url.short_code,
+                'title': url.title,
+                'created_at': url.created_at.isoformat(),
+                'is_active': False,
+                'owner': url.user.email if url.user else None
+            }
+        }, status=status.HTTP_404_NOT_FOUND)
+    
     # Record analytics
     client_ip, is_routable = ipware.ip.get_client_ip(request)
     
@@ -249,49 +267,79 @@ def redirect_to_original(request, short_code):
         city=city
     )
     
-    # Increment counter for the main URL
+    # Increment the click counter
     url.increment_counter()
     
-    # Handle A/B testing if enabled
-    destination_url = url.original_url
+    # For A/B testing, select a variant based on weights
     if url.is_ab_test:
-        # Get all variants
         variants = url.variants.all()
-        
-        if variants:
-            # Select a variant based on weight
-            weights = [variant.weight for variant in variants]
+        if variants.exists():
+            # Calculate total weight (should be 100 but just in case)
+            total_weight = sum(v.weight for v in variants)
             
-            # Select a variant based on weights
-            selected_variant = random.choices(variants, weights=weights, k=1)[0]
+            # Select a random number between 0 and total_weight
+            rand = random.randint(0, total_weight - 1)
             
-            # Update the destination URL
-            destination_url = selected_variant.destination_url
+            # Find the selected variant
+            cumulative_weight = 0
+            selected_variant = None
+            for variant in variants:
+                cumulative_weight += variant.weight
+                if rand < cumulative_weight:
+                    selected_variant = variant
+                    break
             
-            # Increment counter for the selected variant
-            selected_variant.increment_counter()
+            # If a variant was selected, increment its counter and use its destination URL
+            if selected_variant:
+                selected_variant.increment_counter()
+                
+                # If custom redirect page is enabled, return the settings
+                if url.use_redirect_page:
+                    # Get the actual destination URL (decrypted if needed)
+                    destination_url = selected_variant.destination_url
+                    
+                    return Response({
+                        'status': 'success',
+                        'redirect_type': 'custom',
+                        'destination_url': destination_url,
+                        'redirect_settings': {
+                            'type': url.redirect_page_type,
+                            'delay': url.redirect_delay,
+                            'message': url.custom_redirect_message,
+                            'brand_name': url.brand_name,
+                            'brand_logo_url': url.brand_logo_url,
+                            'remaining_clicks': url.max_clicks - url.access_count if url.self_destruct and url.max_clicks else None,
+                            'self_destruct': url.self_destruct
+                        }
+                    })
+                
+                # Direct redirect
+                return HttpResponseRedirect(selected_variant.destination_url)
     
-    # Check if custom redirect page is enabled
+    # If not A/B testing or no variant was selected, use the original URL
+    
+    # Get the destination URL (decrypted if needed)
+    destination_url = url.get_decrypted_url() if url.is_encrypted else url.original_url
+    
+    # If custom redirect page is enabled, return the settings
     if url.use_redirect_page:
-        # Return data for the frontend to handle the custom redirect page
         return Response({
             'status': 'success',
             'redirect_type': 'custom',
             'destination_url': destination_url,
             'redirect_settings': {
-                'page_type': url.redirect_page_type,
+                'type': url.redirect_page_type,
                 'delay': url.redirect_delay,
-                'message': url.custom_redirect_message or f"Redirecting to your destination...",
+                'message': url.custom_redirect_message,
                 'brand_name': url.brand_name,
                 'brand_logo_url': url.brand_logo_url,
-                'title': url.title,
-                'short_code': url.short_code,
-                'full_short_url': f"{settings.URL_SHORTENER_DOMAIN}/s/{url.short_code}"
+                'remaining_clicks': url.max_clicks - url.access_count if url.self_destruct and url.max_clicks else None,
+                'self_destruct': url.self_destruct
             }
         })
-    else:
-        # Direct redirect without custom page
-        return HttpResponseRedirect(destination_url)
+    
+    # Direct redirect
+    return HttpResponseRedirect(destination_url)
 
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])

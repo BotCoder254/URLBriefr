@@ -3,6 +3,8 @@ from django.conf import settings
 import string
 import random
 from django.utils import timezone
+from cryptography.fernet import Fernet
+import base64
 
 def generate_short_code(length=6):
     """Generate a random short code for URL."""
@@ -81,6 +83,14 @@ class ShortenedURL(models.Model):
     custom_redirect_message = models.CharField(max_length=255, blank=True, null=True)
     brand_name = models.CharField(max_length=100, blank=True, null=True)
     brand_logo_url = models.URLField(max_length=2000, blank=True, null=True)
+    
+    # End-to-End Encryption settings
+    is_encrypted = models.BooleanField(default=False, help_text="Whether the destination URL is encrypted")
+    encryption_key = models.CharField(max_length=255, blank=True, null=True, help_text="Encryption key for this URL")
+    
+    # Self-destructing link settings
+    max_clicks = models.PositiveIntegerField(null=True, blank=True, help_text="Maximum number of clicks before the link self-destructs")
+    self_destruct = models.BooleanField(default=False, help_text="Whether the link should self-destruct")
 
     def __str__(self):
         return f"{self.short_code} -> {self.original_url[:50]}..."
@@ -89,6 +99,18 @@ class ShortenedURL(models.Model):
         # Generate a random short code if one is not provided
         if not self.short_code:
             self.short_code = self.generate_unique_code()
+            
+        # Handle encryption if enabled
+        if self.is_encrypted and not self.encryption_key:
+            # Generate a new encryption key
+            key = Fernet.generate_key()
+            self.encryption_key = key.decode()
+            
+            # Encrypt the original URL
+            cipher = Fernet(key)
+            encrypted_url = cipher.encrypt(self.original_url.encode())
+            self.original_url = encrypted_url.decode()
+            
         super().save(*args, **kwargs)
     
     def generate_unique_code(self):
@@ -104,11 +126,34 @@ class ShortenedURL(models.Model):
             return timezone.now() > self.expires_at
         return False
     
+    def should_self_destruct(self):
+        """Check if the URL should self-destruct based on click count."""
+        if self.self_destruct and self.max_clicks:
+            return self.access_count >= self.max_clicks
+        return False
+    
+    def get_decrypted_url(self):
+        """Decrypt and return the original URL if it's encrypted."""
+        if self.is_encrypted and self.encryption_key:
+            try:
+                cipher = Fernet(self.encryption_key.encode())
+                decrypted_url = cipher.decrypt(self.original_url.encode())
+                return decrypted_url.decode()
+            except Exception as e:
+                print(f"Error decrypting URL: {e}")
+                return self.original_url
+        return self.original_url
+    
     def increment_counter(self):
         """Increment access counter and update last accessed time."""
         self.access_count += 1
         self.last_accessed = timezone.now()
-        self.save(update_fields=['access_count', 'last_accessed'])
+        
+        # Check if the URL should self-destruct after this click
+        if self.self_destruct and self.max_clicks and self.access_count >= self.max_clicks:
+            self.is_active = False
+            
+        self.save(update_fields=['access_count', 'last_accessed', 'is_active'])
         
     @classmethod
     def deactivate_expired_urls(cls):
