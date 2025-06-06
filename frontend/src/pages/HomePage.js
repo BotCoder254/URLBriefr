@@ -87,10 +87,15 @@ const HomePage = () => {
     } catch (error) {
       console.error('Error shortening URL:', error);
       let errorMessage = 'Failed to shorten URL. Please try again.';
+      let isDuplicateUrlError = false;
       
       if (error.response?.data) {
         if (error.response.data.original_url) {
           errorMessage = error.response.data.original_url[0];
+          // Check if this is a duplicate URL error (contains "already have a shortened URL")
+          if (errorMessage.includes('already have a shortened URL')) {
+            isDuplicateUrlError = true;
+          }
         } else if (error.response.data.custom_code) {
           errorMessage = error.response.data.custom_code[0];
         } else if (error.response.data.detail) {
@@ -103,6 +108,23 @@ const HomePage = () => {
       }
       
       setError(errorMessage);
+      
+      // If it's a duplicate URL error, show a dashboard link
+      if (isDuplicateUrlError) {
+        const dashboardLink = document.createElement('a');
+        dashboardLink.href = '/dashboard';
+        dashboardLink.className = 'text-primary-600 hover:underline font-medium ml-1';
+        dashboardLink.innerText = 'Go to Dashboard';
+        
+        // Find the error message element and add the link
+        setTimeout(() => {
+          const errorElement = document.querySelector('.error-message');
+          if (errorElement) {
+            errorElement.innerHTML += ' ';
+            errorElement.appendChild(dashboardLink);
+          }
+        }, 100);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -332,7 +354,7 @@ const HomePage = () => {
                     </AnimatePresence>
                     
                     {error && (
-                      <div className="text-red-600 text-sm flex items-center">
+                      <div className="text-red-600 text-sm flex items-center error-message">
                         <FiAlertCircle className="mr-1" />
                         {error}
                       </div>

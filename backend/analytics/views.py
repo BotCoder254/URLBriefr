@@ -2,8 +2,8 @@ from django.shortcuts import render, get_object_or_404
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from django.db.models import Count, F, Sum, Case, When, IntegerField
-from django.db.models.functions import TruncDate, TruncHour, ExtractHour
+from django.db.models import Count, F, Sum, Case, When, IntegerField, Value
+from django.db.models.functions import TruncDate, TruncHour, ExtractHour, Coalesce
 from shortener.models import ShortenedURL
 from .models import ClickEvent
 from shortener.serializers import ShortenedURLSerializer
@@ -54,16 +54,30 @@ class AnalyticsViewSet(viewsets.ViewSet):
                                 .annotate(count=Count('id')) \
                                 .order_by('-count')
         
-        # Get clicks by country
-        clicks_by_country = clicks.values('country') \
-                                 .annotate(count=Count('id')) \
-                                 .order_by('-count')
+        # Get clicks by country - handle NULL values with Coalesce
+        clicks_by_country = clicks.annotate(
+                                country_name=Coalesce('country', Value('Unknown'))
+                            ) \
+                            .values('country_name') \
+                            .annotate(count=Count('id')) \
+                            .order_by('-count')
         
-        # Get clicks by city
-        clicks_by_city = clicks.exclude(city__isnull=True).exclude(city='') \
-                              .values('city', 'country') \
-                              .annotate(count=Count('id')) \
-                              .order_by('-count')[:15]
+        # Format the results to match expected structure
+        clicks_by_country = [{'country': item['country_name'], 'count': item['count']} 
+                             for item in clicks_by_country]
+        
+        # Get clicks by city - handle NULL values for both city and country
+        clicks_by_city = clicks.annotate(
+                              city_name=Coalesce('city', Value('Unknown')),
+                              country_name=Coalesce('country', Value('Unknown'))
+                          ) \
+                          .values('city_name', 'country_name') \
+                          .annotate(count=Count('id')) \
+                          .order_by('-count')[:15]
+        
+        # Format the results to match expected structure
+        clicks_by_city = [{'city': item['city_name'], 'country': item['country_name'], 'count': item['count']} 
+                          for item in clicks_by_city]
         
         # Get clicks by OS
         clicks_by_os = clicks.values('os') \
@@ -157,19 +171,32 @@ class AnalyticsViewSet(viewsets.ViewSet):
                                        .annotate(count=Count('id')) \
                                        .order_by('-count')[:5]
         
-        # Get clicks by country
+        # Get clicks by country - handle NULL or empty values properly
         clicks_by_country = ClickEvent.objects.filter(url__in=urls) \
-                                            .exclude(country__isnull=True).exclude(country='') \
-                                            .values('country') \
+                                            .annotate(
+                                                country_name=Coalesce('country', Value('Unknown'))
+                                            ) \
+                                            .values('country_name') \
                                             .annotate(count=Count('id')) \
                                             .order_by('-count')[:10]
         
-        # Get clicks by city
+        # Format the results to match expected structure
+        clicks_by_country = [{'country': item['country_name'], 'count': item['count']} 
+                            for item in clicks_by_country]
+        
+        # Get clicks by city - handle NULL or empty values for both city and country
         clicks_by_city = ClickEvent.objects.filter(url__in=urls) \
-                                         .exclude(city__isnull=True).exclude(city='') \
-                                         .values('city', 'country') \
-                                         .annotate(count=Count('id')) \
-                                         .order_by('-count')[:15]
+                                        .annotate(
+                                            city_name=Coalesce('city', Value('Unknown')),
+                                            country_name=Coalesce('country', Value('Unknown'))
+                                        ) \
+                                        .values('city_name', 'country_name') \
+                                        .annotate(count=Count('id')) \
+                                        .order_by('-count')[:15]
+        
+        # Format the results to match expected structure
+        clicks_by_city = [{'city': item['city_name'], 'country': item['country_name'], 'count': item['count']} 
+                         for item in clicks_by_city]
         
         # Get unique IP addresses
         unique_ips = ClickEvent.objects.filter(url__in=urls).values('ip_address').distinct().count()

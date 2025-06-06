@@ -97,6 +97,25 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'expiration_date': 'Expiration date must be in the future.'
                 })
+        
+        # Check if the URL already exists for the current user
+        original_url = data.get('original_url')
+        request = self.context.get('request')
+        
+        if request and request.user.is_authenticated and original_url:
+            existing_url = ShortenedURL.objects.filter(
+                user=request.user,
+                original_url=original_url
+            ).first()
+            
+            if existing_url:
+                raise serializers.ValidationError({
+                    'original_url': f'You already have a shortened URL for this link. Please check your dashboard for the short code: {existing_url.short_code}'
+                })
+        
+        # For anonymous users, we can't check duplicates effectively since they don't have accounts
+        # We could optionally check by IP, but that's not a reliable way to track user identity
+        # So we'll allow anonymous users to create duplicate URLs
                 
         return data
         

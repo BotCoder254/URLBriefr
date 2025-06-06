@@ -13,6 +13,7 @@ import qrcode
 import io
 from django.conf import settings
 import base64
+import requests
 
 class ShortenedURLViewSet(viewsets.ModelViewSet):
     """ViewSet for shortened URLs."""
@@ -101,6 +102,21 @@ def redirect_to_original(request, short_code):
     user_agent_string = request.META.get('HTTP_USER_AGENT', '')
     user_agent = parse(user_agent_string)
     
+    # Get geolocation data from IP
+    country = None
+    city = None
+    
+    try:
+        # Use a free IP geolocation API
+        geo_response = requests.get(f'https://ipapi.co/{client_ip}/json/')
+        if geo_response.status_code == 200:
+            geo_data = geo_response.json()
+            country = geo_data.get('country_name')
+            city = geo_data.get('city')
+    except Exception as e:
+        # If geolocation fails, just continue without location data
+        print(f"Geolocation error: {e}")
+    
     # Create click event
     ClickEvent.objects.create(
         url=url,
@@ -109,7 +125,9 @@ def redirect_to_original(request, short_code):
         browser=f"{user_agent.browser.family} {user_agent.browser.version_string}",
         device=user_agent.device.family,
         os=f"{user_agent.os.family} {user_agent.os.version_string}",
-        referrer=request.META.get('HTTP_REFERER', '')
+        referrer=request.META.get('HTTP_REFERER', ''),
+        country=country,
+        city=city
     )
     
     # Increment counter
