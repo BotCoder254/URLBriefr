@@ -5,7 +5,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import ShortenedURL, Tag, ABTestVariant
 from .serializers import ShortenedURLSerializer, CreateShortenedURLSerializer, TagSerializer, ABTestVariantSerializer
-from analytics.models import ClickEvent
+from analytics.models import ClickEvent, UserSession
 from django.http import HttpResponseRedirect, HttpResponse
 from django.utils import timezone
 from user_agents import parse
@@ -16,6 +16,8 @@ from django.conf import settings
 import base64
 import requests
 import random
+import uuid
+import hashlib
 from django.db.models import Count, Q
 
 # Constants for user limits
@@ -236,7 +238,37 @@ def redirect_to_original(request, short_code):
         # If geolocation fails, just continue without location data
         print(f"Geolocation error: {e}")
     
-    # Create click event
+    # Session tracking for retention and funnel metrics
+    # First, try to get session ID from cookies
+    session_id = request.COOKIES.get('urlbriefr_session')
+    
+    # If no session ID in cookie, create a new one
+    if not session_id:
+        session_id = str(uuid.uuid4())
+    
+    # Create a unique visitor ID based on IP and User-Agent (hashed for privacy)
+    visitor_hash_source = f"{client_ip}|{user_agent_string}"
+    visitor_id = hashlib.md5(visitor_hash_source.encode()).hexdigest()
+    
+    # Find or create a session
+    session, created = UserSession.objects.get_or_create(
+        url=url,
+        session_id=session_id,
+        defaults={
+            'visitor_id': visitor_id,
+            'ip_address': client_ip,
+            'user_agent': user_agent_string,
+            'browser': f"{user_agent.browser.family} {user_agent.browser.version_string}",
+            'device': user_agent.device.family,
+            'os': f"{user_agent.os.family} {user_agent.os.version_string}",
+        }
+    )
+    
+    # If session exists, update it to track retention
+    if not created:
+        session.update_visit()
+    
+    # Create click event with session info
     click_event = ClickEvent.objects.create(
         url=url,
         ip_address=client_ip,
@@ -246,7 +278,8 @@ def redirect_to_original(request, short_code):
         os=f"{user_agent.os.family} {user_agent.os.version_string}",
         referrer=request.META.get('HTTP_REFERER', ''),
         country=country,
-        city=city
+        city=city,
+        session_id=session_id
     )
     
     # Increment counter for the main URL
@@ -271,10 +304,13 @@ def redirect_to_original(request, short_code):
             # Increment counter for the selected variant
             selected_variant.increment_counter()
     
+    # Base response - will add cookies later
+    response = None
+    
     # Check if custom redirect page is enabled
     if url.use_redirect_page:
         # Return data for the frontend to handle the custom redirect page
-        return Response({
+        response = Response({
             'status': 'success',
             'redirect_type': 'custom',
             'destination_url': destination_url,
@@ -286,12 +322,25 @@ def redirect_to_original(request, short_code):
                 'brand_logo_url': url.brand_logo_url,
                 'title': url.title,
                 'short_code': url.short_code,
-                'full_short_url': f"{settings.URL_SHORTENER_DOMAIN}/s/{url.short_code}"
+                'full_short_url': f"{settings.URL_SHORTENER_DOMAIN}/s/{url.short_code}",
+                'session_id': session_id  # Include session ID for tracking completion
             }
         })
     else:
         # Direct redirect without custom page
-        return HttpResponseRedirect(destination_url)
+        response = HttpResponseRedirect(destination_url)
+    
+    # Set session cookie for funnel tracking
+    response.set_cookie(
+        'urlbriefr_session', 
+        session_id, 
+        max_age=60*60*24*30,  # 30 days
+        secure=settings.SESSION_COOKIE_SECURE,
+        httponly=True,
+        samesite='Lax'
+    )
+    
+    return response
 
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])

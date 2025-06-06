@@ -4,6 +4,7 @@ import { FiArrowRight, FiExternalLink, FiLink, FiCopy, FiCheckCircle } from 'rea
 import RocketAnimation from './animations/RocketAnimation';
 import WorkingAnimation from './animations/WorkingAnimation';
 import DiggingAnimation from './animations/DiggingAnimation';
+import urlService from '../../services/urlService';
 
 const CustomRedirectPage = ({ destinationUrl, settings }) => {
   const [timeLeft, setTimeLeft] = useState(settings.delay || 3);
@@ -31,10 +32,27 @@ const CustomRedirectPage = ({ destinationUrl, settings }) => {
       });
   };
   
+  // Track funnel step - destination reached
+  useEffect(() => {
+    // Track that user has reached the destination page
+    if (settings.session_id && settings.short_code) {
+      urlService.trackFunnelStep(settings.short_code, settings.session_id, 'reached_destination');
+    }
+  }, [settings.session_id, settings.short_code]);
+  
+  // Track completion of funnel (clicking to destination)
+  const handleRedirect = () => {
+    // Track the completion action before redirecting
+    if (settings.session_id && settings.short_code) {
+      urlService.trackFunnelStep(settings.short_code, settings.session_id, 'completed_action');
+    }
+    window.location.href = destinationUrl;
+  };
+  
   // Countdown timer effect
   useEffect(() => {
     if (timeLeft <= 0) {
-      window.location.href = destinationUrl;
+      handleRedirect();
       return;
     }
     
@@ -116,6 +134,7 @@ const CustomRedirectPage = ({ destinationUrl, settings }) => {
                 className="text-primary-600 hover:underline truncate max-w-[200px]"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={handleRedirect}
               >
                 {formatUrl(destinationUrl)}
               </a>
@@ -155,6 +174,7 @@ const CustomRedirectPage = ({ destinationUrl, settings }) => {
               <a 
                 href={destinationUrl}
                 className="text-primary-600 hover:underline flex items-center"
+                onClick={handleRedirect}
               >
                 Go now <FiArrowRight className="ml-1" />
               </a>
@@ -163,6 +183,7 @@ const CustomRedirectPage = ({ destinationUrl, settings }) => {
             <a 
               href={destinationUrl}
               className="btn btn-primary w-full flex items-center justify-center"
+              onClick={handleRedirect}
             >
               Continue to destination <FiArrowRight className="ml-2" />
             </a>

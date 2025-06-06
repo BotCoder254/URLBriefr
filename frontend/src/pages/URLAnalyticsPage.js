@@ -312,6 +312,275 @@ const URLAnalyticsPage = () => {
     );
   };
   
+  // Add Retention Metrics Section
+  const RetentionMetricsSection = ({ analytics }) => {
+    if (!analytics || !analytics.retention) {
+      return null;
+    }
+    
+    const { retention } = analytics;
+    
+    // Prepare data for return visit distribution chart
+    const returnVisitData = retention.return_visit_distribution 
+      ? retention.return_visit_distribution.map(item => ({
+          name: `${item.visit_count} visits`,
+          value: item.session_count
+        }))
+      : [];
+    
+    return (
+      <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-soft p-6">
+        <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
+          Visitor Retention Analysis
+        </h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          {/* 1-Day Retention */}
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <h4 className="text-sm font-medium text-dark-600 mb-1">1-Day Retention</h4>
+            <div className="flex items-end">
+              <span className="text-2xl font-display font-bold text-primary-600">
+                {retention.one_day_retention_rate}%
+              </span>
+              <span className="text-xs text-dark-500 ml-2 mb-1">
+                ({retention.one_day_retention} visitors)
+              </span>
+            </div>
+          </div>
+          
+          {/* 7-Day Retention */}
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <h4 className="text-sm font-medium text-dark-600 mb-1">7-Day Retention</h4>
+            <div className="flex items-end">
+              <span className="text-2xl font-display font-bold text-primary-600">
+                {retention.seven_day_retention_rate}%
+              </span>
+              <span className="text-xs text-dark-500 ml-2 mb-1">
+                ({retention.seven_day_retention} visitors)
+              </span>
+            </div>
+          </div>
+          
+          {/* 30-Day Retention */}
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <h4 className="text-sm font-medium text-dark-600 mb-1">30-Day Retention</h4>
+            <div className="flex items-end">
+              <span className="text-2xl font-display font-bold text-primary-600">
+                {retention.thirty_day_retention_rate}%
+              </span>
+              <span className="text-xs text-dark-500 ml-2 mb-1">
+                ({retention.thirty_day_retention} visitors)
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Return Visit Distribution Chart */}
+          <div>
+            <h4 className="text-base font-medium text-dark-800 mb-3">Return Visit Distribution</h4>
+            <div className="h-60">
+              {returnVisitData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={returnVisitData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({name, percent}) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                      labelLine={false}
+                    >
+                      {returnVisitData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${value} sessions`, 'Count']} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <p className="text-dark-400">No return visit data available</p>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Retention Stats */}
+          <div>
+            <h4 className="text-base font-medium text-dark-800 mb-3">Retention Statistics</h4>
+            <div className="space-y-4">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-dark-500">Total Sessions</p>
+                    <p className="text-lg font-display font-semibold">{retention.total_sessions}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-xs text-dark-500">Avg. Return Time</p>
+                    <p className="text-lg font-display font-semibold">
+                      {retention.avg_return_time_hours 
+                        ? `${retention.avg_return_time_hours} hours` 
+                        : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gray-50 rounded-lg p-4">
+                <p className="text-sm font-medium mb-2">Key Insights</p>
+                <ul className="text-xs text-dark-500 space-y-1">
+                  <li>• {retention.one_day_retention_rate > 5 
+                    ? `Strong 1-day retention at ${retention.one_day_retention_rate}%` 
+                    : `Low 1-day retention at ${retention.one_day_retention_rate}%`}</li>
+                  <li>• {retention.seven_day_retention_rate > 2 
+                    ? `Good 7-day retention at ${retention.seven_day_retention_rate}%` 
+                    : `Weak 7-day retention at ${retention.seven_day_retention_rate}%`}</li>
+                  <li>• Average visitor returns in {retention.avg_return_time_hours || 'N/A'} hours</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
+  // Add Funnel Analysis Section
+  const FunnelAnalysisSection = ({ analytics }) => {
+    if (!analytics || !analytics.funnel) {
+      return null;
+    }
+    
+    const { funnel } = analytics;
+    const { stages, drop_offs } = funnel;
+    
+    // Calculate conversion percentages
+    const destinationRate = stages.total_clicks > 0 
+      ? (stages.reached_destination / stages.total_clicks * 100).toFixed(1) 
+      : 0;
+      
+    const actionRate = stages.reached_destination > 0 
+      ? (stages.completed_action / stages.reached_destination * 100).toFixed(1) 
+      : 0;
+      
+    const overallRate = stages.total_clicks > 0 
+      ? (stages.completed_action / stages.total_clicks * 100).toFixed(1) 
+      : 0;
+    
+    // Prepare data for funnel chart
+    const funnelData = [
+      { name: 'Clicks', value: stages.total_clicks },
+      { name: 'Destination', value: stages.reached_destination },
+      { name: 'Action Completed', value: stages.completed_action }
+    ];
+    
+    return (
+      <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-soft p-6">
+        <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
+          Conversion Funnel Analysis
+        </h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          {/* Click to Destination */}
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <h4 className="text-sm font-medium text-dark-600 mb-1">Click → Destination</h4>
+            <div className="flex items-end">
+              <span className="text-2xl font-display font-bold text-accent-600">
+                {destinationRate}%
+              </span>
+              <span className="text-xs text-dark-500 ml-2 mb-1">
+                conversion rate
+              </span>
+            </div>
+            <div className="mt-2 text-xs text-red-500">
+              {drop_offs.click_to_destination}% drop-off
+            </div>
+          </div>
+          
+          {/* Destination to Action */}
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <h4 className="text-sm font-medium text-dark-600 mb-1">Destination → Action</h4>
+            <div className="flex items-end">
+              <span className="text-2xl font-display font-bold text-accent-600">
+                {actionRate}%
+              </span>
+              <span className="text-xs text-dark-500 ml-2 mb-1">
+                conversion rate
+              </span>
+            </div>
+            <div className="mt-2 text-xs text-red-500">
+              {drop_offs.destination_to_action}% drop-off
+            </div>
+          </div>
+          
+          {/* Overall Conversion */}
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <h4 className="text-sm font-medium text-dark-600 mb-1">Overall Conversion</h4>
+            <div className="flex items-end">
+              <span className="text-2xl font-display font-bold text-accent-600">
+                {overallRate}%
+              </span>
+              <span className="text-xs text-dark-500 ml-2 mb-1">
+                conversion rate
+              </span>
+            </div>
+            <div className="mt-2 text-xs text-red-500">
+              {drop_offs.overall_drop_off}% drop-off
+            </div>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 gap-6">
+          {/* Funnel Visualization */}
+          <div>
+            <h4 className="text-base font-medium text-dark-800 mb-3">Funnel Stages</h4>
+            <div className="h-60">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={funnelData}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 30, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="name" type="category" />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#10b981" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-6 bg-gray-50 rounded-lg p-4">
+          <p className="text-sm font-medium mb-2">Funnel Insights</p>
+          <ul className="text-xs text-dark-500 space-y-1">
+            <li>• {drop_offs.click_to_destination > 50 
+              ? `High drop-off (${drop_offs.click_to_destination}%) between clicks and destination visits` 
+              : `Good destination visit rate with only ${drop_offs.click_to_destination}% drop-off`}</li>
+            <li>• {drop_offs.destination_to_action > 70 
+              ? `Very high drop-off (${drop_offs.destination_to_action}%) from destination to action completion` 
+              : drop_offs.destination_to_action > 40 
+                ? `Moderate drop-off (${drop_offs.destination_to_action}%) from destination to action completion`
+                : `Strong action completion rate with only ${drop_offs.destination_to_action}% drop-off`}</li>
+            <li>• Overall funnel efficiency: {overallRate > 25 
+              ? 'Excellent' 
+              : overallRate > 10 
+                ? 'Good' 
+                : overallRate > 5 
+                  ? 'Average' 
+                  : 'Poor'}</li>
+          </ul>
+        </div>
+      </motion.div>
+    );
+  };
+  
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
@@ -649,6 +918,12 @@ const URLAnalyticsPage = () => {
               
               {/* Add the recent visitors section */}
               <RecentVisitorsSection analytics={analytics} />
+              
+              {/* Add Retention Metrics Section */}
+              <RetentionMetricsSection analytics={analytics} />
+              
+              {/* Add Funnel Analysis Section */}
+              <FunnelAnalysisSection analytics={analytics} />
             </>
           )}
         </motion.div>

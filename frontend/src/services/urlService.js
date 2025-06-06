@@ -359,6 +359,25 @@ const urlService = {
     } catch (error) {
       throw error;
     }
+  },
+  
+  // Track funnel step for analytics
+  trackFunnelStep: async (shortCode, sessionId, step) => {
+    try {
+      const data = {
+        short_code: shortCode,
+        session_id: sessionId,
+        step: step // 'reached_destination' or 'completed_action'
+      };
+      
+      // Make the API call to update the funnel step
+      const response = await api.post('/analytics/track-funnel/', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error tracking funnel step:', error.response?.data || error.message);
+      // Don't throw error here to prevent breaking the user experience
+      return null;
+    }
   }
 };
 

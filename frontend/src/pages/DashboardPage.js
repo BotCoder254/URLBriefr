@@ -325,7 +325,7 @@ const DashboardPage = () => {
   
   // Format date string
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return 'Never';
     const date = new Date(dateString);
     return date.toLocaleDateString();
   };
