@@ -12,6 +12,13 @@ const FolderSelector = ({ selectedFolder, onChange }) => {
   
   useEffect(() => {
     fetchFolders();
+    
+    // Poll for folders every 3 seconds when component is mounted
+    const folderRefreshInterval = setInterval(() => {
+      fetchFolders();
+    }, 3000);
+    
+    return () => clearInterval(folderRefreshInterval);
   }, []);
   
   // Refresh folders when the dropdown is opened

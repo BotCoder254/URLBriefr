@@ -216,6 +216,15 @@ const DashboardPage = () => {
       // Add new URL to list
       setUrls(prevUrls => [response, ...prevUrls]);
       
+      // Refresh folders to ensure new folders are displayed
+      if (urlData.folder) {
+        try {
+          await urlService.getFolders();
+        } catch (folderErr) {
+          console.warn('Error refreshing folders:', folderErr);
+        }
+      }
+      
       // Reset form
       setNewUrl({
         original_url: '',
@@ -247,11 +256,36 @@ const DashboardPage = () => {
       
     } catch (err) {
       console.error('Error creating URL:', err);
+      
+      // Get more detailed error information
+      const responseData = err.response?.data || {};
+      console.log('Error response data:', responseData);
+      
+      // Check if there's a specific error message
+      let errorMessage = 'Failed to create URL. Please try again.';
+      
+      // Look for specific field errors
+      if (typeof responseData === 'object') {
+        // Check common field errors
+        const fieldErrors = [
+          responseData.original_url?.[0],
+          responseData.custom_code?.[0],
+          responseData.variants?.[0],
+          responseData.expiration_days?.[0],
+          responseData.expiration_date?.[0],
+          responseData.error
+        ].filter(Boolean);
+        
+        if (fieldErrors.length > 0) {
+          errorMessage = fieldErrors[0];
+        } else if (typeof responseData === 'string') {
+          // Sometimes the error might be a string
+          errorMessage = responseData;
+        }
+      }
+      
       setFormErrors({
-        submit: err.response?.data?.original_url?.[0] || 
-                err.response?.data?.custom_code?.[0] ||
-                err.response?.data?.variants?.[0] ||
-                'Failed to create URL. Please try again.'
+        submit: errorMessage
       });
     } finally {
       setIsSubmitting(false);
@@ -1178,7 +1212,13 @@ const DashboardPage = () => {
                 </div>
                 
                 {/* Advanced options */}
-                <AdvancedOptionsForm formData={newUrl} setFormData={(updatedData) => setNewUrl(updatedData)} />
+                <AdvancedOptionsForm 
+                  formData={newUrl} 
+                  setFormData={(updatedData) => {
+                    console.log('Updating form data from AdvancedOptionsForm:', updatedData);
+                    setNewUrl(updatedData);
+                  }} 
+                />
                 
                 <div className="flex justify-end space-x-3 pt-4 mt-4 border-t border-gray-100">
                   <button

@@ -51,6 +51,23 @@ const urlService = {
         }
       }
       
+      // Fix for tag_ids - ensure it's an array of IDs, not objects
+      if (urlData.tag_ids && Array.isArray(urlData.tag_ids)) {
+        // Convert tag objects to just their IDs
+        urlData.tag_ids = urlData.tag_ids.map(tag => {
+          // If it's already a number or string ID, return as is
+          if (typeof tag === 'number' || typeof tag === 'string') {
+            return tag;
+          }
+          // If it's an object with an id property, return just the id
+          else if (tag && typeof tag === 'object' && 'id' in tag) {
+            return tag.id;
+          }
+          // Otherwise return null (which will be filtered out)
+          return null;
+        }).filter(id => id !== null);
+      }
+      
       // Ensure expiration settings are properly set
       if (urlData.expiration_type === 'days' && urlData.expiration_days) {
         // Make sure expiration_days is a number
@@ -72,8 +89,26 @@ const urlService = {
         return response.data;
       }
       
+      // Sanitize the URL data to match backend expectations
+      const cleanedData = { ...urlData };
+      
+      // Convert date objects to ISO string for serialization if needed
+      if (cleanedData.expiration_date instanceof Date) {
+        cleanedData.expiration_date = cleanedData.expiration_date.toISOString();
+      }
+      
+      // Make sure all properties are valid types
+      Object.keys(cleanedData).forEach(key => {
+        // Convert undefined values to null to avoid serialization issues
+        if (cleanedData[key] === undefined) {
+          cleanedData[key] = null;
+        }
+      });
+      
+      console.log('Sending URL creation request with sanitized data:', cleanedData);
+      
       // Regular URL creation
-      const response = await api.post('/urls/', urlData);
+      const response = await api.post('/urls/', cleanedData);
       return response.data;
     } catch (error) {
       console.error('Error in createUrl:', error.response?.data || error.message);
@@ -358,7 +393,7 @@ const urlService = {
   // Get all folders used by the user
   getFolders: async () => {
     try {
-      // Fix the endpoint path to correctly match the backend
+      // Make request to backend endpoint for folders
       const response = await api.get('/urls/folders/');
       console.log('Folders API response:', response.data);
       
@@ -371,11 +406,20 @@ const urlService = {
       // Filter out any null, undefined, or empty string values
       const validFolders = response.data.filter(folder => folder && folder.trim() !== '');
       console.log('Valid folders after filtering:', validFolders);
+      
+      // Update shared global folder list (to make sure folders are available everywhere)
+      window._cachedFolders = validFolders;
+      
       return validFolders;
     } catch (error) {
       // Detailed error logging
       console.error('Error getting folders:', error.response?.data || error.message);
       console.error('Error details:', error);
+      
+      // If we have cached folders, return those instead of an empty array
+      if (window._cachedFolders && Array.isArray(window._cachedFolders)) {
+        return window._cachedFolders;
+      }
       
       // Return empty array instead of throwing to prevent UI errors
       return [];
