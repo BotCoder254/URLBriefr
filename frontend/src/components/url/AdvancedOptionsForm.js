@@ -9,12 +9,14 @@ const AdvancedOptionsForm = ({ formData, setFormData }) => {
   const [isRedirectExpanded, setIsRedirectExpanded] = useState(false);
   
   const handleExpirationTypeChange = (type) => {
-    setFormData({
+    const updatedData = {
       ...formData,
       expiration_type: type,
       expiration_date: type === 'date' ? formData.expiration_date || new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000) : null,
       expiration_days: type === 'days' ? formData.expiration_days || 7 : null
-    });
+    };
+    console.log('Setting expiration type:', type, updatedData);
+    setFormData(updatedData);
   };
   
   const handleRedirectPageToggle = (useRedirect) => {

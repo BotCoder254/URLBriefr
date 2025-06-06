@@ -36,6 +36,7 @@ const DashboardPage = () => {
     original_url: '',
     custom_code: '',
     title: '',
+    expiration_type: 'none',
     expiration_days: '',
     is_active: true,
     is_ab_test: false,
@@ -44,7 +45,10 @@ const DashboardPage = () => {
       { name: 'Variant B', destination_url: '', weight: 50 }
     ],
     folder: '',
-    tag_ids: []
+    tag_ids: [],
+    use_redirect_page: false,
+    redirect_page_type: 'default',
+    redirect_delay: 3
   });
   
   // Expiration form state
@@ -123,7 +127,9 @@ const DashboardPage = () => {
   }, [searchTerm, fetchUrls]);
   
   const handleCreateUrl = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) {
+      e.preventDefault();
+    }
     
     // Validate form
     const errors = {};
@@ -167,10 +173,27 @@ const DashboardPage = () => {
         urlData.original_url = `https://${urlData.original_url}`;
       }
       
-      // Convert expiration_days to number if present
-      if (urlData.expiration_days) {
-        urlData.expiration_days = parseInt(urlData.expiration_days, 10);
+      // Process expiration settings
+      if (urlData.expiration_type) {
+        // If expiration type is days, ensure we have a number
+        if (urlData.expiration_type === 'days' && urlData.expiration_days) {
+          urlData.expiration_days = parseInt(urlData.expiration_days, 10);
+        } else if (urlData.expiration_type === 'none') {
+          // If no expiration, remove any expiration dates
+          delete urlData.expiration_days;
+          delete urlData.expiration_date;
+        }
+      } else {
+        // If no expiration type is set, default to none
+        urlData.expiration_type = 'none';
       }
+      
+      // Remove empty fields from advanced options
+      if (!urlData.custom_redirect_message) delete urlData.custom_redirect_message;
+      if (!urlData.brand_name) delete urlData.brand_name;
+      if (!urlData.brand_logo_url) delete urlData.brand_logo_url;
+      
+      console.log('Creating URL with data:', urlData);
       
       // If A/B testing is not enabled, remove variants
       if (!urlData.is_ab_test) {
@@ -198,6 +221,7 @@ const DashboardPage = () => {
         original_url: '',
         custom_code: '',
         title: '',
+        expiration_type: 'none',
         expiration_days: '',
         is_active: true,
         is_ab_test: false,
@@ -206,7 +230,13 @@ const DashboardPage = () => {
           { name: 'Variant B', destination_url: '', weight: 50 }
         ],
         folder: '',
-        tag_ids: []
+        tag_ids: [],
+        use_redirect_page: false,
+        redirect_page_type: 'default',
+        redirect_delay: 3,
+        custom_redirect_message: '',
+        brand_name: '',
+        brand_logo_url: ''
       });
       
       setCreateSuccess(true);
@@ -945,11 +975,11 @@ const DashboardPage = () => {
       
       {/* Create URL Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-dark-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-dark-900 bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-xl shadow-soft p-6 max-w-lg w-full"
+            className="bg-white rounded-xl shadow-soft p-6 max-w-lg w-full my-8 max-h-[90vh] overflow-y-auto"
           >
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-display font-semibold text-dark-900">Create New URL</h2>
@@ -1150,7 +1180,7 @@ const DashboardPage = () => {
                 {/* Advanced options */}
                 <AdvancedOptionsForm formData={newUrl} setFormData={(updatedData) => setNewUrl(updatedData)} />
                 
-                <div className="flex justify-end space-x-3 pt-4">
+                <div className="flex justify-end space-x-3 pt-4 mt-4 border-t border-gray-100">
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
@@ -1159,7 +1189,8 @@ const DashboardPage = () => {
                     Cancel
                   </button>
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={handleCreateUrl}
                     disabled={isSubmitting}
                     className="btn btn-primary"
                   >

@@ -5,6 +5,8 @@ const urlService = {
   // Create a new shortened URL
   createUrl: async (urlData) => {
     try {
+      console.log('Creating URL with data:', urlData);
+      
       // Ensure original_url is properly formatted
       if (urlData.original_url && !urlData.original_url.match(/^https?:\/\//)) {
         urlData.original_url = `https://${urlData.original_url}`;
@@ -47,6 +49,12 @@ const urlService = {
             return { ...v, weight: Math.round(v.weight * factor) };
           });
         }
+      }
+      
+      // Ensure expiration settings are properly set
+      if (urlData.expiration_type === 'days' && urlData.expiration_days) {
+        // Make sure expiration_days is a number
+        urlData.expiration_days = Number(urlData.expiration_days);
       }
       
       // For folder creation, ensure we're sending a minimal payload
