@@ -89,15 +89,8 @@ const FolderManagementModal = ({ isOpen, onClose }) => {
       setNewFolderName('');
       setError(null);
       
-      // Delete the temporary URL since we just needed it to register the folder
-      if (response && response.id) {
-        try {
-          await urlService.deleteUrl(response.id);
-        } catch (deleteErr) {
-          console.error('Error deleting temporary URL:', deleteErr);
-          // Non-critical error, don't show to user
-        }
-      }
+      // Keep the temporary URL to maintain the folder in the system
+      // This ensures the folder will be properly listed
     } catch (err) {
       console.error('Error creating folder:', err);
       if (err.response?.data?.error) {

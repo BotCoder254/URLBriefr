@@ -203,21 +203,39 @@ const urlService = {
         expiration_type: 'days',
         expiration_days: expirationValue
       };
+      console.log('Setting expiration in days:', expirationValue);
     } else if (expirationType === 'date') {
       urlData = {
         expiration_type: 'date',
         expiration_date: expirationValue
       };
+      console.log('Setting expiration to date:', expirationValue);
     } else {
       // Remove expiration
       urlData = {
         expiration_type: 'none',
         expires_at: null
       };
+      console.log('Removing expiration date');
     }
     
-    const response = await api.patch(`/urls/${id}/`, urlData);
-    return response.data;
+    try {
+      console.log('Sending expiration update request for URL ID:', id, 'with data:', urlData);
+      const response = await api.patch(`/urls/${id}/`, urlData);
+      console.log('Expiration update response:', response.data);
+      
+      // Verify that the response contains an expiration date if we set one
+      if (expirationType !== 'none' && !response.data.expires_at) {
+        console.warn('Warning: URL expiration was set but response has no expires_at field:', response.data);
+      } else {
+        console.log('New expiration date set:', response.data.expires_at);
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error updating URL expiration:', error.response?.data || error.message);
+      throw error;
+    }
   },
   
   // Get QR code image URL for a shortened URL
@@ -332,6 +350,7 @@ const urlService = {
   // Get all folders used by the user
   getFolders: async () => {
     try {
+      // Fix the endpoint path to correctly match the backend
       const response = await api.get('/urls/folders/');
       console.log('Folders API response:', response.data);
       
@@ -343,9 +362,13 @@ const urlService = {
       
       // Filter out any null, undefined, or empty string values
       const validFolders = response.data.filter(folder => folder && folder.trim() !== '');
+      console.log('Valid folders after filtering:', validFolders);
       return validFolders;
     } catch (error) {
+      // Detailed error logging
       console.error('Error getting folders:', error.response?.data || error.message);
+      console.error('Error details:', error);
+      
       // Return empty array instead of throwing to prevent UI errors
       return [];
     }

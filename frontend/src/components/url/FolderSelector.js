@@ -30,13 +30,25 @@ const FolderSelector = ({ selectedFolder, onChange }) => {
       // Ensure folders is always an array
       const validFolders = Array.isArray(data) ? data.filter(Boolean) : [];
       console.log('Valid folders after filtering:', validFolders);
-      setFolders(validFolders);
       
+      // Get any locally created folders that are still being processed
+      if (selectedFolder && !validFolders.includes(selectedFolder)) {
+        console.log('Adding selected folder that was not returned from backend:', selectedFolder);
+        validFolders.push(selectedFolder);
+      }
+      
+      setFolders(validFolders);
       setError(null);
     } catch (err) {
       console.error('Error fetching folders:', err);
       setError('Failed to load folders. Please try again later.');
-      setFolders([]);
+      
+      // Keep the current folders in case of API error
+      if (selectedFolder) {
+        setFolders([selectedFolder]);
+      } else {
+        setFolders([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -73,13 +85,10 @@ const FolderSelector = ({ selectedFolder, onChange }) => {
       is_active: false
     };
     
+    console.log('Creating folder in FolderSelector:', newFolder);
     urlService.createUrl(folderPayload).then(response => {
-      // Delete the temporary URL if creation was successful
-      if (response && response.id) {
-        urlService.deleteUrl(response.id).catch(err => {
-          console.error('Error deleting temporary URL:', err);
-        });
-      }
+      console.log('Successfully created folder:', newFolder, 'with URL ID:', response.id);
+      // Keep the temporary URL to maintain the folder in the system
     }).catch(err => {
       console.error('Error registering folder:', err);
       // Non-critical error, don't show to user

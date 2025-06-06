@@ -140,7 +140,7 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
         if not user.is_authenticated:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
         
-        # Get all folders for this user - ensure we get non-empty folders
+        # Get all folders for this user - include folders from temporary URLs
         folders_query = ShortenedURL.objects.filter(
             user=user
         ).exclude(
@@ -156,6 +156,18 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
         # Ensure we never return None
         if folder_list is None:
             folder_list = []
+        
+        # Debug information
+        all_urls = ShortenedURL.objects.filter(user=user)
+        print(f"Total URLs for user: {all_urls.count()}")
+        
+        temp_urls = ShortenedURL.objects.filter(user=user, title='Temporary URL for folder creation')
+        print(f"Temporary folder URLs: {temp_urls.count()}")
+        
+        urls_with_folders = ShortenedURL.objects.filter(user=user).exclude(folder='').exclude(folder__isnull=True)
+        print(f"URLs with folders: {urls_with_folders.count()}")
+        if urls_with_folders.count() > 0:
+            print(f"Sample folders: {list(urls_with_folders.values_list('folder', flat=True)[:5])}")
             
         return Response(folder_list)
     

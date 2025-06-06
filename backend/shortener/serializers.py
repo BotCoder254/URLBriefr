@@ -155,6 +155,42 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(f"Tag '{tag.name}' does not belong to you.")
             
         return value
+        
+    def update(self, instance, validated_data):
+        """Update a shortened URL."""
+        # Handle expiration fields explicitly
+        expiration_type = validated_data.pop('expiration_type', None)
+        
+        if expiration_type:
+            print(f"Updating URL expiration - Type: {expiration_type}")
+            
+            if expiration_type == 'days':
+                expiration_days = validated_data.pop('expiration_days', None)
+                if expiration_days:
+                    instance.expires_at = timezone.now() + timedelta(days=expiration_days)
+                    print(f"Setting expiration date {expiration_days} days from now: {instance.expires_at}")
+            elif expiration_type == 'date':
+                expiration_date = validated_data.pop('expiration_date', None)
+                if expiration_date:
+                    instance.expires_at = expiration_date
+                    print(f"Setting expiration date to: {instance.expires_at}")
+            elif expiration_type == 'none':
+                # Explicitly set expires_at to None for 'never' expiration
+                instance.expires_at = None
+                print("Setting expiration date to None (never expires)")
+        
+        # Remove extra fields that aren't in the model
+        if 'expiration_days' in validated_data:
+            validated_data.pop('expiration_days')
+        if 'expiration_date' in validated_data:
+            validated_data.pop('expiration_date')
+            
+        # Update the remaining fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+            
+        instance.save()
+        return instance
 
 class CreateShortenedURLSerializer(serializers.ModelSerializer):
     """Serializer for creating shortened URLs with less fields."""
@@ -358,14 +394,22 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
         # Process expiration if provided
         expiration_type = validated_data.pop('expiration_type', 'none')
         
+        print(f"Processing URL expiration - Type: {expiration_type}")
+        
         if expiration_type == 'days':
             expiration_days = validated_data.pop('expiration_days', None)
             if expiration_days:
                 validated_data['expires_at'] = timezone.now() + timedelta(days=expiration_days)
+                print(f"Setting expiration date {expiration_days} days from now: {validated_data['expires_at']}")
         elif expiration_type == 'date':
             expiration_date = validated_data.pop('expiration_date', None)
             if expiration_date:
                 validated_data['expires_at'] = expiration_date
+                print(f"Setting expiration date to: {validated_data['expires_at']}")
+        elif expiration_type == 'none':
+            # Explicitly set expires_at to None for 'never' expiration
+            validated_data['expires_at'] = None
+            print("Setting expiration date to None (never expires)")
                 
         # Remove extra fields that aren't in the model
         if 'expiration_days' in validated_data:
