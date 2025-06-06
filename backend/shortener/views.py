@@ -271,8 +271,27 @@ def redirect_to_original(request, short_code):
             # Increment counter for the selected variant
             selected_variant.increment_counter()
     
-    # Redirect to the destination URL
-    return HttpResponseRedirect(destination_url)
+    # Check if custom redirect page is enabled
+    if url.use_redirect_page:
+        # Return data for the frontend to handle the custom redirect page
+        return Response({
+            'status': 'success',
+            'redirect_type': 'custom',
+            'destination_url': destination_url,
+            'redirect_settings': {
+                'page_type': url.redirect_page_type,
+                'delay': url.redirect_delay,
+                'message': url.custom_redirect_message or f"Redirecting to your destination...",
+                'brand_name': url.brand_name,
+                'brand_logo_url': url.brand_logo_url,
+                'title': url.title,
+                'short_code': url.short_code,
+                'full_short_url': f"{settings.URL_SHORTENER_DOMAIN}/s/{url.short_code}"
+            }
+        })
+    else:
+        # Direct redirect without custom page
+        return HttpResponseRedirect(destination_url)
 
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])

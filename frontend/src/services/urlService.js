@@ -171,15 +171,24 @@ const urlService = {
     return response.data;
   },
   
-  // Check URL status before redirecting
+  // Check URL status before redirect
   checkUrlStatus: async (shortCode) => {
     try {
-      // This will try to redirect but will return error info if inactive/expired
-      const response = await api.get(`/s/${shortCode}/`, { validateStatus: false });
+      // The API will either redirect or return status information
+      const response = await api.get(`/s/${shortCode}/`, {
+        // Important: don't follow redirects, we need to handle them in the frontend
+        maxRedirects: 0
+      });
+      
+      // If we get a response, it means there's either an error or custom redirect settings
       return response.data;
     } catch (error) {
-      if (error.response && error.response.data) {
-        return error.response.data;
+      if (error.response) {
+        // If we got an error response from the server
+        if (error.response.status === 404) {
+          // URL is inactive or expired
+          return error.response.data;
+        }
       }
       throw error;
     }
@@ -339,6 +348,16 @@ const urlService = {
       console.error('Error getting folders:', error.response?.data || error.message);
       // Return empty array instead of throwing to prevent UI errors
       return [];
+    }
+  },
+  
+  // Update URL with custom redirect page settings
+  updateUrlRedirectSettings: async (urlId, redirectSettings) => {
+    try {
+      const response = await api.patch(`/shortener/urls/${urlId}/`, redirectSettings);
+      return response.data;
+    } catch (error) {
+      throw error;
     }
   }
 };

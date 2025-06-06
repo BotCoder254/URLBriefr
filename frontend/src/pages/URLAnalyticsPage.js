@@ -138,18 +138,6 @@ const URLAnalyticsPage = () => {
   // COLORS for charts
   const COLORS = ['#0ea5e9', '#d946ef', '#10b981', '#f97316', '#f43f5e', '#8b5cf6'];
   
-  // Get device icon based on name
-  const getDeviceIcon = (name) => {
-    const lowerName = name.toLowerCase();
-    if (lowerName.includes('mobile') || lowerName.includes('phone')) {
-      return <FiSmartphone className="mr-1" />;
-    } else if (lowerName.includes('tablet') || lowerName.includes('ipad')) {
-      return <FiTablet className="mr-1" />;
-    } else {
-      return <FiMonitor className="mr-1" />;
-    }
-  };
-  
   // Add this section to display the location data
   const LocationSection = ({ analytics }) => {
     if (!analytics || !analytics.clicks_by_country || analytics.clicks_by_country.length === 0) {

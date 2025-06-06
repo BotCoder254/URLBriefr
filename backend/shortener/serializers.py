@@ -72,7 +72,9 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             'created_at', 'last_accessed', 'expires_at', 'user',
             'access_count', 'title', 'is_custom_code', 'is_active',
             'is_expired', 'clicks_count', 'qr_code_url', 'is_ab_test',
-            'variants', 'tags', 'tag_ids', 'folder'
+            'variants', 'tags', 'tag_ids', 'folder',
+            'use_redirect_page', 'redirect_page_type', 'redirect_delay',
+            'custom_redirect_message', 'brand_name', 'brand_logo_url'
         ]
         read_only_fields = [
             'id', 'created_at', 'last_accessed',
@@ -81,7 +83,13 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             'user': {'required': False},
-            'folder': {'required': False}
+            'folder': {'required': False},
+            'use_redirect_page': {'required': False},
+            'redirect_page_type': {'required': False},
+            'redirect_delay': {'required': False},
+            'custom_redirect_message': {'required': False},
+            'brand_name': {'required': False},
+            'brand_logo_url': {'required': False}
         }
     
     def get_full_short_url(self, obj):
@@ -182,13 +190,27 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
         write_only=True
     )
     
+    # Custom redirect page fields
+    use_redirect_page = serializers.BooleanField(required=False, default=False)
+    redirect_page_type = serializers.ChoiceField(
+        choices=['default', 'rocket', 'working', 'digging'],
+        default='default',
+        required=False
+    )
+    redirect_delay = serializers.IntegerField(required=False, min_value=1, max_value=10, default=3)
+    custom_redirect_message = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    brand_name = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    brand_logo_url = serializers.URLField(required=False, allow_blank=True, max_length=2000)
+    
     class Meta:
         model = ShortenedURL
         fields = [
             'original_url', 'custom_code', 'title', 
             'expiration_days', 'expiration_date', 'expiration_type',
             'is_active', 'is_ab_test', 'variants', 'tag_ids',
-            'new_tags', 'folder'
+            'new_tags', 'folder',
+            'use_redirect_page', 'redirect_page_type', 'redirect_delay',
+            'custom_redirect_message', 'brand_name', 'brand_logo_url'
         ]
     
     def to_representation(self, instance):

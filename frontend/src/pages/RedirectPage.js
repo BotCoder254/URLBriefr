@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import urlService from '../services/urlService';
 import InactiveUrlModal from '../components/url/InactiveUrlModal';
+import CustomRedirectPage from '../components/url/CustomRedirectPage';
 
 const RedirectPage = () => {
   const { shortCode } = useParams();
@@ -9,6 +10,7 @@ const RedirectPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [inactiveUrlInfo, setInactiveUrlInfo] = useState(null);
+  const [redirectInfo, setRedirectInfo] = useState(null);
   
   useEffect(() => {
     const checkAndRedirect = async () => {
@@ -16,12 +18,22 @@ const RedirectPage = () => {
         setLoading(true);
         const result = await urlService.checkUrlStatus(shortCode);
         
-        // If we got a result with status 'error', the URL is inactive or expired
-        if (result && result.status === 'error') {
-          setInactiveUrlInfo(result);
+        if (result) {
+          if (result.status === 'error') {
+            // URL is inactive or expired
+            setInactiveUrlInfo(result);
+          } else if (result.status === 'success' && result.redirect_type === 'custom') {
+            // Custom redirect page is enabled
+            setRedirectInfo({
+              destinationUrl: result.destination_url,
+              settings: result.redirect_settings
+            });
+          } else {
+            // Direct redirect if no custom page
+            window.location.href = result.destination_url || '/';
+          }
         } else {
           // If we got here, something unexpected happened
-          // The normal behavior would be a redirect from the backend
           setError('An unexpected error occurred. Please try again later.');
         }
       } catch (err) {
@@ -33,7 +45,7 @@ const RedirectPage = () => {
     };
     
     checkAndRedirect();
-  }, [shortCode, navigate]);
+  }, [shortCode]);
   
   const handleCloseModal = () => {
     navigate('/');
@@ -43,7 +55,7 @@ const RedirectPage = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600 mb-4"></div>
-        <p className="text-dark-500">Redirecting...</p>
+        <p className="text-dark-500">Loading...</p>
       </div>
     );
   }
@@ -62,6 +74,13 @@ const RedirectPage = () => {
         </div>
       </div>
     );
+  }
+  
+  if (redirectInfo) {
+    return <CustomRedirectPage 
+      destinationUrl={redirectInfo.destinationUrl}
+      settings={redirectInfo.settings}
+    />;
   }
   
   return (

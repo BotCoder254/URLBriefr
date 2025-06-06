@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiLink, FiCopy, FiTrash2, FiEdit, FiPlus, FiX, FiAlertCircle, FiCheckCircle, FiExternalLink, FiSearch, FiBarChart2, FiToggleLeft, FiToggleRight, FiCalendar, FiClock, FiEye, FiGrid, FiGitBranch, FiTag, FiFolder, FiFilter, FiSettings } from 'react-icons/fi';
+import { FiLink, FiCopy, FiTrash2, FiEdit, FiPlus, FiX, FiAlertCircle, FiCheckCircle, FiExternalLink, FiSearch, FiBarChart2, FiToggleLeft, FiToggleRight, FiCalendar, FiClock, FiEye, FiGrid, FiTag, FiFolder, FiFilter, FiSettings } from 'react-icons/fi';
 import urlService from '../services/urlService';
 import QRCodeModal from '../components/url/QRCodeModal';
 import ABTestingForm from '../components/url/ABTestingForm';
@@ -10,6 +10,7 @@ import FolderSelector from '../components/url/FolderSelector';
 import TagBadge from '../components/url/TagBadge';
 import TagManagementModal from '../components/url/TagManagementModal';
 import FolderManagementModal from '../components/url/FolderManagementModal';
+import AdvancedOptionsForm from '../components/url/AdvancedOptionsForm';
 
 const DashboardPage = () => {
   const [urls, setUrls] = useState([]);
@@ -74,20 +75,8 @@ const DashboardPage = () => {
     return tomorrow.toISOString().split('T')[0];
   };
   
-  useEffect(() => {
-    fetchUrls();
-  }, []);
-  
-  useEffect(() => {
-    // Apply filters when search term changes, but with a small delay
-    const delayDebounceFn = setTimeout(() => {
-      fetchUrls();
-    }, 500);
-    
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
-  
-  const fetchUrls = async () => {
+  // Define fetchUrls before it's used in useEffect
+  const fetchUrls = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -118,7 +107,20 @@ const DashboardPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterTags, filterFolder, searchTerm]);
+  
+  useEffect(() => {
+    fetchUrls();
+  }, []);
+  
+  useEffect(() => {
+    // Apply filters when search term changes, but with a small delay
+    const delayDebounceFn = setTimeout(() => {
+      fetchUrls();
+    }, 500);
+    
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm, fetchUrls]);
   
   const handleCreateUrl = async (e) => {
     e.preventDefault();
@@ -1138,6 +1140,9 @@ const DashboardPage = () => {
                     </div>
                   </div>
                 </div>
+                
+                {/* Advanced options */}
+                <AdvancedOptionsForm formData={newUrl} setFormData={(updatedData) => setNewUrl(updatedData)} />
                 
                 <div className="flex justify-end space-x-3 pt-4">
                   <button

@@ -63,6 +63,24 @@ class ShortenedURL(models.Model):
     
     # Folder/organization
     folder = models.CharField(max_length=100, blank=True, null=True)
+    
+    # Custom redirect page settings
+    use_redirect_page = models.BooleanField(default=False)
+    redirect_page_type = models.CharField(
+        max_length=20, 
+        choices=[
+            ('default', 'Default'),
+            ('rocket', 'Rocket Animation'),
+            ('working', 'People Working'),
+            ('digging', 'Digging Animation'),
+        ],
+        default='default',
+        blank=True
+    )
+    redirect_delay = models.PositiveSmallIntegerField(default=3, help_text="Delay in seconds before redirecting")
+    custom_redirect_message = models.CharField(max_length=255, blank=True, null=True)
+    brand_name = models.CharField(max_length=100, blank=True, null=True)
+    brand_logo_url = models.URLField(max_length=2000, blank=True, null=True)
 
     def __str__(self):
         return f"{self.short_code} -> {self.original_url[:50]}..."
