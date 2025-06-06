@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMenu, FiX, FiUser, FiLogOut, FiLink, FiPieChart } from 'react-icons/fi';
+import { FiMenu, FiX, FiUser, FiLogOut, FiLink, FiPieChart, FiGitBranch } from 'react-icons/fi';
 import useAuth from '../../hooks/useAuth';
 
 const Navbar = () => {
@@ -64,6 +64,9 @@ const Navbar = () => {
                   <Link to="/analytics" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
                     Analytics
                   </Link>
+                  <Link to="/ab-testing" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
+                    A/B Testing
+                  </Link>
                 </>
               )}
               
@@ -125,6 +128,14 @@ const Navbar = () => {
                           onClick={() => setIsProfileOpen(false)}
                         >
                           <FiPieChart className="mr-2" /> Analytics
+                        </Link>
+                        
+                        <Link 
+                          to="/ab-testing" 
+                          className="flex items-center px-4 py-2 text-sm text-dark-700 hover:bg-gray-100"
+                          onClick={() => setIsProfileOpen(false)}
+                        >
+                          <FiGitBranch className="mr-2" /> A/B Testing
                         </Link>
                         
                         <button 
@@ -207,6 +218,16 @@ const Navbar = () => {
                       onClick={() => setIsOpen(false)}
                     >
                       Analytics
+                    </Link>
+                  </motion.div>
+                  
+                  <motion.div variants={itemVariants}>
+                    <Link 
+                      to="/ab-testing" 
+                      className="block px-3 py-2 rounded-md text-base font-medium text-dark-700 hover:text-primary-600 hover:bg-gray-50"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      A/B Testing
                     </Link>
                   </motion.div>
                 </>

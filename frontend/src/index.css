@@ -52,3 +52,72 @@
   }
 }
 
+/* Toggle Switch */
+.toggle-checkbox:checked {
+  right: 0;
+  border-color: #fff;
+}
+
+.toggle-label {
+  transition: background-color 0.2s ease;
+}
+
+.toggle-checkbox {
+  transition: all 0.2s ease;
+  right: 4px;
+}
+
+.toggle-checkbox:checked + .toggle-label {
+  background-color: #10b981;
+}
+
+/* A/B Testing Styles */
+.ab-test-toggle {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 24px;
+}
+
+.ab-test-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.ab-test-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 24px;
+}
+
+.ab-test-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .ab-test-slider {
+  background-color: #0ea5e9;
+}
+
+input:focus + .ab-test-slider {
+  box-shadow: 0 0 1px #0ea5e9;
+}
+
+input:checked + .ab-test-slider:before {
+  transform: translateX(16px);
+}
+

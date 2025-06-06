@@ -1,9 +1,27 @@
 from rest_framework import serializers
-from .models import ShortenedURL
+from .models import ShortenedURL, ABTestVariant
 from analytics.models import ClickEvent
 from django.conf import settings
 from django.utils import timezone
 from datetime import datetime, timedelta
+
+class ABTestVariantSerializer(serializers.ModelSerializer):
+    """Serializer for A/B test variants."""
+    
+    conversion_rate = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ABTestVariant
+        fields = [
+            'id', 'name', 'destination_url', 'weight', 
+            'access_count', 'conversion_count', 'conversion_rate'
+        ]
+    
+    def get_conversion_rate(self, obj):
+        """Calculate conversion rate."""
+        if obj.access_count == 0:
+            return 0
+        return round((obj.conversion_count / obj.access_count) * 100, 2)
 
 class ShortenedURLSerializer(serializers.ModelSerializer):
     """Serializer for shortened URLs."""
@@ -12,6 +30,7 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
     is_expired = serializers.SerializerMethodField()
     clicks_count = serializers.SerializerMethodField()
     qr_code_url = serializers.SerializerMethodField()
+    variants = ABTestVariantSerializer(many=True, read_only=True)
     
     class Meta:
         model = ShortenedURL
@@ -19,7 +38,8 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             'id', 'original_url', 'short_code', 'full_short_url',
             'created_at', 'last_accessed', 'expires_at', 'user',
             'access_count', 'title', 'is_custom_code', 'is_active',
-            'is_expired', 'clicks_count', 'qr_code_url'
+            'is_expired', 'clicks_count', 'qr_code_url', 'is_ab_test',
+            'variants'
         ]
         read_only_fields = [
             'id', 'created_at', 'last_accessed',
@@ -69,12 +89,19 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
         required=False
     )
     
+    # A/B testing fields
+    is_ab_test = serializers.BooleanField(required=False, default=False)
+    variants = serializers.ListField(
+        child=serializers.DictField(),
+        required=False
+    )
+    
     class Meta:
         model = ShortenedURL
         fields = [
             'original_url', 'custom_code', 'title', 
             'expiration_days', 'expiration_date', 'expiration_type',
-            'is_active'
+            'is_active', 'is_ab_test', 'variants'
         ]
         
     def validate(self, data):
@@ -103,25 +130,66 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         
         if request and request.user.is_authenticated and original_url:
-            existing_url = ShortenedURL.objects.filter(
-                user=request.user,
-                original_url=original_url
-            ).first()
-            
-            if existing_url:
-                raise serializers.ValidationError({
-                    'original_url': f'You already have a shortened URL for this link. Please check your dashboard for the short code: {existing_url.short_code}'
-                })
+            # Don't check for duplicates if this is an A/B test
+            if not data.get('is_ab_test', False):
+                existing_url = ShortenedURL.objects.filter(
+                    user=request.user,
+                    original_url=original_url
+                ).first()
+                
+                if existing_url:
+                    raise serializers.ValidationError({
+                        'original_url': f'You already have a shortened URL for this link. Please check your dashboard for the short code: {existing_url.short_code}'
+                    })
         
         # For anonymous users, we can't check duplicates effectively since they don't have accounts
         # We could optionally check by IP, but that's not a reliable way to track user identity
         # So we'll allow anonymous users to create duplicate URLs
+        
+        # Validate A/B testing variants
+        if data.get('is_ab_test', False):
+            variants = data.get('variants', [])
+            
+            if not variants:
+                raise serializers.ValidationError({
+                    'variants': 'At least one variant is required for A/B testing.'
+                })
+            
+            if len(variants) < 2:
+                raise serializers.ValidationError({
+                    'variants': 'At least two variants are required for A/B testing.'
+                })
+            
+            # Check that all variants have the required fields
+            for i, variant in enumerate(variants):
+                if not variant.get('destination_url'):
+                    raise serializers.ValidationError({
+                        f'variants[{i}].destination_url': 'Destination URL is required for each variant.'
+                    })
+                
+                # Ensure weight is between 1 and 100
+                weight = variant.get('weight', 50)
+                if weight < 1 or weight > 100:
+                    raise serializers.ValidationError({
+                        f'variants[{i}].weight': 'Weight must be between 1 and 100.'
+                    })
+            
+            # Check that weights sum to 100
+            total_weight = sum(variant.get('weight', 50) for variant in variants)
+            if total_weight != 100:
+                raise serializers.ValidationError({
+                    'variants': f'The sum of all variant weights must be 100. Current sum: {total_weight}'
+                })
                 
         return data
         
     def create(self, validated_data):
         """Create a new shortened URL with custom options."""
         user = self.context['request'].user if 'request' in self.context else None
+        
+        # Extract A/B testing variants
+        is_ab_test = validated_data.pop('is_ab_test', False)
+        variants_data = validated_data.pop('variants', [])
         
         # Process custom code if provided
         custom_code = validated_data.pop('custom_code', None)
@@ -151,4 +219,20 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
         if user and user.is_authenticated:
             validated_data['user'] = user
         
-        return ShortenedURL.objects.create(**validated_data) 
+        # Set A/B testing flag
+        validated_data['is_ab_test'] = is_ab_test
+        
+        # Create the shortened URL
+        shortened_url = ShortenedURL.objects.create(**validated_data)
+        
+        # Create A/B testing variants if applicable
+        if is_ab_test and variants_data:
+            for variant_data in variants_data:
+                ABTestVariant.objects.create(
+                    shortened_url=shortened_url,
+                    destination_url=variant_data.get('destination_url'),
+                    weight=variant_data.get('weight', 50),
+                    name=variant_data.get('name', 'Variant')
+                )
+        
+        return shortened_url 

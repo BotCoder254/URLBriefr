@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiLink, FiCopy, FiArrowRight, FiCheckCircle, FiAlertCircle, FiSettings, FiX, FiClock, FiTag, FiCode, FiCalendar, FiGrid } from 'react-icons/fi';
+import { FiLink, FiCopy, FiArrowRight, FiCheckCircle, FiAlertCircle, FiSettings, FiX, FiClock, FiTag, FiCode, FiCalendar, FiGrid, FiGitBranch } from 'react-icons/fi';
 import urlService from '../services/urlService';
 import QRCodeModal from '../components/url/QRCodeModal';
+import ABTestingForm from '../components/url/ABTestingForm';
 
 const HomePage = () => {
   const [originalUrl, setOriginalUrl] = useState('');
@@ -21,6 +22,13 @@ const HomePage = () => {
   const [expirationType, setExpirationType] = useState('never');
   const [expirationDays, setExpirationDays] = useState('');
   const [expirationDate, setExpirationDate] = useState('');
+  
+  // A/B testing options
+  const [isABTesting, setIsABTesting] = useState(false);
+  const [variants, setVariants] = useState([
+    { name: 'Variant A', destination_url: '', weight: 50 },
+    { name: 'Variant B', destination_url: '', weight: 50 }
+  ]);
   
   // Get tomorrow's date in YYYY-MM-DD format for min date in date picker
   const getTomorrowDate = () => {
@@ -56,6 +64,23 @@ const HomePage = () => {
       return;
     }
     
+    // If A/B testing is enabled, validate variants
+    if (isABTesting) {
+      // Check if all variants have destination URLs
+      const emptyVariants = variants.filter(v => !v.destination_url);
+      if (emptyVariants.length > 0) {
+        setError('All variants must have destination URLs');
+        return;
+      }
+      
+      // Check if weights sum to 100
+      const totalWeight = variants.reduce((sum, v) => sum + Number(v.weight), 0);
+      if (totalWeight !== 100) {
+        setError(`Variant weights must sum to 100% (current: ${totalWeight}%)`);
+        return;
+      }
+    }
+    
     setIsSubmitting(true);
     setError('');
     
@@ -78,6 +103,16 @@ const HomePage = () => {
           urlData.expiration_date = expirationDate;
         } else if (expirationType === 'never') {
           urlData.expiration_type = 'never';
+        }
+        
+        // Add A/B testing data if enabled
+        if (isABTesting) {
+          urlData.is_ab_test = true;
+          // Ensure weights are numbers, not strings
+          urlData.variants = variants.map(variant => ({
+            ...variant,
+            weight: Number(variant.weight)
+          }));
         }
       }
       
@@ -104,6 +139,8 @@ const HomePage = () => {
           errorMessage = error.response.data.expiration_date[0];
         } else if (error.response.data.expiration_days) {
           errorMessage = error.response.data.expiration_days[0];
+        } else if (error.response.data.variants) {
+          errorMessage = error.response.data.variants[0];
         }
       }
       
@@ -165,6 +202,21 @@ const HomePage = () => {
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 }
+  };
+  
+  // Toggle A/B testing
+  const handleToggleABTesting = () => {
+    setIsABTesting(!isABTesting);
+    
+    // If enabling A/B testing, set the first variant's destination URL to the original URL
+    if (!isABTesting && originalUrl) {
+      const validatedUrl = validateUrl(originalUrl);
+      if (validatedUrl) {
+        const updatedVariants = [...variants];
+        updatedVariants[0].destination_url = validatedUrl;
+        setVariants(updatedVariants);
+      }
+    }
   };
   
   return (
@@ -349,6 +401,45 @@ const HomePage = () => {
                               </div>
                             )}
                           </div>
+                          
+                          {/* A/B Testing Toggle */}
+                          <div className="pt-2 border-t border-gray-100">
+                            <div className="flex items-center justify-between">
+                              <label htmlFor="ab_testing" className="flex items-center text-sm font-medium text-dark-700">
+                                <FiGitBranch className="inline mr-1" /> A/B Testing
+                              </label>
+                              <div className="relative inline-block w-10 mr-2 align-middle select-none">
+                                <input
+                                  type="checkbox"
+                                  id="ab_testing"
+                                  checked={isABTesting}
+                                  onChange={handleToggleABTesting}
+                                  className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
+                                />
+                                <label
+                                  htmlFor="ab_testing"
+                                  className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer ${isABTesting ? 'bg-primary-500' : 'bg-gray-300'}`}
+                                ></label>
+                              </div>
+                            </div>
+                            <p className="mt-1 text-xs text-dark-500">
+                              Split traffic between multiple destination URLs to test effectiveness.
+                            </p>
+                          </div>
+                          
+                          {/* A/B Testing Form */}
+                          <AnimatePresence>
+                            {isABTesting && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="mt-4 pt-3 border-t border-gray-100"
+                              >
+                                <ABTestingForm variants={variants} setVariants={setVariants} />
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -410,6 +501,11 @@ const HomePage = () => {
                               {shortenedUrlData.expires_at && (
                                 <p>
                                   <span className="font-medium">Expires:</span> {formatDate(shortenedUrlData.expires_at)}
+                                </p>
+                              )}
+                              {shortenedUrlData.is_ab_test && (
+                                <p>
+                                  <span className="font-medium">A/B Testing:</span> Enabled ({shortenedUrlData.variants.length} variants)
                                 </p>
                               )}
                               <div className="pt-3 flex flex-wrap items-center gap-2">

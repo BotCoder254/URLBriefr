@@ -10,6 +10,45 @@ const urlService = {
         urlData.original_url = `https://${urlData.original_url}`;
       }
       
+      // Ensure A/B testing variant weights are numbers
+      if (urlData.is_ab_test && urlData.variants) {
+        urlData.variants = urlData.variants.map(variant => ({
+          ...variant,
+          weight: Number(variant.weight)
+        }));
+        
+        // Ensure variant destination URLs are properly formatted
+        urlData.variants = urlData.variants.map(variant => {
+          if (variant.destination_url && !variant.destination_url.match(/^https?:\/\//)) {
+            return {
+              ...variant,
+              destination_url: `https://${variant.destination_url}`
+            };
+          }
+          return variant;
+        });
+        
+        // If first variant has no destination URL, use the original URL
+        if (!urlData.variants[0].destination_url && urlData.original_url) {
+          urlData.variants[0].destination_url = urlData.original_url;
+        }
+        
+        // Ensure weights sum to 100
+        const totalWeight = urlData.variants.reduce((sum, v) => sum + v.weight, 0);
+        if (totalWeight !== 100) {
+          // Adjust the weights proportionally
+          const factor = 100 / totalWeight;
+          urlData.variants = urlData.variants.map((v, i, arr) => {
+            if (i === arr.length - 1) {
+              // Make sure the last variant makes the total exactly 100
+              const sumOthers = arr.slice(0, -1).reduce((sum, v) => sum + Math.round(v.weight * factor), 0);
+              return { ...v, weight: 100 - sumOthers };
+            }
+            return { ...v, weight: Math.round(v.weight * factor) };
+          });
+        }
+      }
+      
       const response = await api.post('/urls/', urlData);
       return response.data;
     } catch (error) {
@@ -32,6 +71,40 @@ const urlService = {
   
   // Update a URL
   updateUrl: async (id, urlData) => {
+    // Ensure A/B testing variant weights are numbers if present
+    if (urlData.is_ab_test && urlData.variants) {
+      urlData.variants = urlData.variants.map(variant => ({
+        ...variant,
+        weight: Number(variant.weight)
+      }));
+      
+      // Ensure variant destination URLs are properly formatted
+      urlData.variants = urlData.variants.map(variant => {
+        if (variant.destination_url && !variant.destination_url.match(/^https?:\/\//)) {
+          return {
+            ...variant,
+            destination_url: `https://${variant.destination_url}`
+          };
+        }
+        return variant;
+      });
+      
+      // Ensure weights sum to 100
+      const totalWeight = urlData.variants.reduce((sum, v) => sum + v.weight, 0);
+      if (totalWeight !== 100) {
+        // Adjust the weights proportionally
+        const factor = 100 / totalWeight;
+        urlData.variants = urlData.variants.map((v, i, arr) => {
+          if (i === arr.length - 1) {
+            // Make sure the last variant makes the total exactly 100
+            const sumOthers = arr.slice(0, -1).reduce((sum, v) => sum + Math.round(v.weight * factor), 0);
+            return { ...v, weight: 100 - sumOthers };
+          }
+          return { ...v, weight: Math.round(v.weight * factor) };
+        });
+      }
+    }
+    
     const response = await api.patch(`/urls/${id}/`, urlData);
     return response.data;
   },
@@ -109,10 +182,14 @@ const urlService = {
   getQRCodeBase64: async (shortCode) => {
     try {
       const response = await api.get(`/qr/${shortCode}/?format=base64`);
-      return response.data.qr_code;
+      if (response && response.data && response.data.qr_code) {
+        return response.data.qr_code;
+      }
+      console.error('Invalid QR code response:', response);
+      return null;
     } catch (error) {
       console.error('Error getting QR code:', error.response?.data || error.message);
-      throw error;
+      return null;
     }
   },
   
@@ -133,6 +210,17 @@ const urlService = {
       return true;
     } catch (error) {
       console.error('Error downloading QR code:', error);
+      throw error;
+    }
+  },
+  
+  // Get A/B testing statistics
+  getABTestingStats: async (id) => {
+    try {
+      const response = await api.get(`/analytics/${id}/ab-testing/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting A/B testing stats:', error.response?.data || error.message);
       throw error;
     }
   }

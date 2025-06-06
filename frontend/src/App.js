@@ -18,6 +18,7 @@ import URLAnalyticsPage from './pages/URLAnalyticsPage';
 import ProfilePage from './pages/ProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
 import RedirectPage from './pages/RedirectPage';
+import ABTestingPage from './pages/ABTestingPage';
 
 function App() {
   return (
@@ -72,6 +73,17 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <URLAnalyticsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/ab-testing"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ABTestingPage />
                 </Layout>
               </ProtectedRoute>
             }

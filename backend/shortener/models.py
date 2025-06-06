@@ -35,6 +35,9 @@ class ShortenedURL(models.Model):
     title = models.CharField(max_length=255, blank=True, null=True)
     is_custom_code = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    
+    # A/B testing flag
+    is_ab_test = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.short_code} -> {self.original_url[:50]}..."
@@ -78,3 +81,38 @@ class ShortenedURL(models.Model):
             expired_urls.update(is_active=False)
             
         return count
+
+
+class ABTestVariant(models.Model):
+    """Model to store A/B test variants for a shortened URL."""
+    
+    shortened_url = models.ForeignKey(
+        ShortenedURL,
+        on_delete=models.CASCADE,
+        related_name='variants'
+    )
+    destination_url = models.URLField(max_length=2000)
+    weight = models.PositiveIntegerField(default=50)  # Percentage weight (0-100)
+    name = models.CharField(max_length=100, default="Variant")  # Name for the variant (e.g., "Version A")
+    
+    # Analytics
+    access_count = models.PositiveIntegerField(default=0)
+    conversion_count = models.PositiveIntegerField(default=0)  # Optional: for tracking conversions
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['created_at']
+    
+    def __str__(self):
+        return f"{self.name} ({self.weight}%) -> {self.destination_url[:50]}..."
+    
+    def increment_counter(self):
+        """Increment access counter."""
+        self.access_count += 1
+        self.save(update_fields=['access_count'])
+    
+    def increment_conversion(self):
+        """Increment conversion counter."""
+        self.conversion_count += 1
+        self.save(update_fields=['conversion_count'])

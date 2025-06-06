@@ -14,6 +14,7 @@ import io
 from django.conf import settings
 import base64
 import requests
+import random
 
 class ShortenedURLViewSet(viewsets.ModelViewSet):
     """ViewSet for shortened URLs."""
@@ -118,7 +119,7 @@ def redirect_to_original(request, short_code):
         print(f"Geolocation error: {e}")
     
     # Create click event
-    ClickEvent.objects.create(
+    click_event = ClickEvent.objects.create(
         url=url,
         ip_address=client_ip,
         user_agent=user_agent_string,
@@ -130,11 +131,30 @@ def redirect_to_original(request, short_code):
         city=city
     )
     
-    # Increment counter
+    # Increment counter for the main URL
     url.increment_counter()
     
-    # Redirect to original URL
-    return HttpResponseRedirect(url.original_url)
+    # Handle A/B testing if enabled
+    destination_url = url.original_url
+    if url.is_ab_test:
+        # Get all variants
+        variants = url.variants.all()
+        
+        if variants:
+            # Select a variant based on weight
+            weights = [variant.weight for variant in variants]
+            
+            # Select a variant based on weights
+            selected_variant = random.choices(variants, weights=weights, k=1)[0]
+            
+            # Update the destination URL
+            destination_url = selected_variant.destination_url
+            
+            # Increment counter for the selected variant
+            selected_variant.increment_counter()
+    
+    # Redirect to the destination URL
+    return HttpResponseRedirect(destination_url)
 
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])

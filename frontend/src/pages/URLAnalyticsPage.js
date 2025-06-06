@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiArrowLeft, FiBarChart2, FiGlobe, FiClock, FiCalendar, FiCopy, FiCheckCircle, FiAlertCircle, FiToggleLeft, FiToggleRight, FiSmartphone, FiMonitor, FiTablet, FiUser } from 'react-icons/fi';
+import { FiArrowLeft, FiBarChart2, FiGlobe, FiClock, FiCalendar, FiCopy, FiCheckCircle, FiAlertCircle, FiToggleLeft, FiToggleRight, FiSmartphone, FiMonitor, FiTablet, FiUser, FiGitBranch } from 'react-icons/fi';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import urlService from '../services/urlService';
+import ABTestingStats from '../components/url/ABTestingStats';
 
 const URLAnalyticsPage = () => {
   const { id } = useParams();
@@ -299,6 +300,26 @@ const URLAnalyticsPage = () => {
             </tbody>
           </table>
         </div>
+      </motion.div>
+    );
+  };
+  
+  // Add this section after LocationSection
+  const ABTestingSection = ({ analytics }) => {
+    if (!analytics || !analytics.url || !analytics.url.is_ab_test || !analytics.url.variants || analytics.url.variants.length === 0) {
+      return null;
+    }
+    
+    return (
+      <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-soft p-6">
+        <div className="flex items-center mb-4">
+          <div className="h-8 w-8 rounded-md bg-secondary-500 text-white flex items-center justify-center mr-3">
+            <FiGitBranch className="h-5 w-5" />
+          </div>
+          <h3 className="text-lg font-display font-medium text-dark-900">A/B Testing Analytics</h3>
+        </div>
+        
+        <ABTestingStats variants={analytics.url.variants} />
       </motion.div>
     );
   };
@@ -634,6 +655,9 @@ const URLAnalyticsPage = () => {
               
               {/* Add the new location section */}
               <LocationSection analytics={analytics} />
+              
+              {/* Add the AB testing section */}
+              <ABTestingSection analytics={analytics} />
               
               {/* Add the recent visitors section */}
               <RecentVisitorsSection analytics={analytics} />

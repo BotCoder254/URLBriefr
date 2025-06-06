@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiX, FiDownload, FiShare2, FiLink, FiCheckCircle } from 'react-icons/fi';
+import { FiX, FiDownload, FiShare2, FiLink, FiCheckCircle, FiRefreshCw, FiAlertCircle, FiGitBranch } from 'react-icons/fi';
 import urlService from '../../services/urlService';
 
 const QRCodeModal = ({ url, onClose }) => {
@@ -9,13 +9,21 @@ const QRCodeModal = ({ url, onClose }) => {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   
   useEffect(() => {
     const fetchQRCode = async () => {
       try {
         setIsLoading(true);
+        setError(null);
+        
         const data = await urlService.getQRCodeBase64(url.short_code);
-        setQrCodeData(data);
+        if (data) {
+          setQrCodeData(data);
+          setError(null);
+        } else {
+          setError('Failed to load QR code. Please try again.');
+        }
       } catch (err) {
         console.error('Error fetching QR code:', err);
         setError('Failed to load QR code. Please try again.');
@@ -27,7 +35,11 @@ const QRCodeModal = ({ url, onClose }) => {
     if (url && url.short_code) {
       fetchQRCode();
     }
-  }, [url]);
+  }, [url, retryCount]);
+  
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+  };
   
   const handleDownload = async () => {
     try {
@@ -74,8 +86,17 @@ const QRCodeModal = ({ url, onClose }) => {
         
         <div className="space-y-4">
           {error && (
-            <div className="bg-red-50 text-red-700 p-4 rounded-lg">
-              <p>{error}</p>
+            <div className="bg-red-50 text-red-700 p-4 rounded-lg flex items-center justify-between">
+              <div className="flex items-center">
+                <FiAlertCircle className="mr-2 flex-shrink-0" />
+                <p>{error}</p>
+              </div>
+              <button 
+                onClick={handleRetry}
+                className="text-primary-600 hover:text-primary-700 flex items-center"
+              >
+                <FiRefreshCw className="mr-1" /> Retry
+              </button>
             </div>
           )}
           
@@ -92,25 +113,41 @@ const QRCodeModal = ({ url, onClose }) => {
           
           <div className="flex flex-col items-center justify-center p-4 bg-white border border-gray-200 rounded-lg">
             {isLoading ? (
-              <div className="animate-pulse flex flex-col items-center justify-center h-64 w-64">
-                <div className="w-full h-full bg-gray-200 rounded-lg"></div>
-                <p className="mt-2 text-dark-500">Loading QR Code...</p>
+              <div className="flex flex-col items-center justify-center h-64 w-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600 mb-4"></div>
+                <p className="text-dark-500">Loading QR Code...</p>
               </div>
             ) : qrCodeData ? (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}
+                className="relative group"
               >
                 <img 
                   src={qrCodeData} 
                   alt="QR Code" 
                   className="h-64 w-64 object-contain"
                 />
+                <div className="absolute inset-0 bg-dark-900 bg-opacity-0 group-hover:bg-opacity-10 flex items-center justify-center transition-all duration-200 rounded-lg">
+                  <button
+                    onClick={handleDownload}
+                    className="opacity-0 group-hover:opacity-100 btn btn-primary btn-sm"
+                  >
+                    <FiDownload className="mr-1" /> Download
+                  </button>
+                </div>
               </motion.div>
             ) : (
               <div className="flex flex-col items-center justify-center h-64 w-64">
-                <p className="text-dark-500">No QR code available</p>
+                <FiAlertCircle className="h-12 w-12 text-red-500 mb-2" />
+                <p className="text-dark-500 text-center">QR code could not be loaded</p>
+                <button 
+                  onClick={handleRetry}
+                  className="mt-4 btn btn-outline btn-sm"
+                >
+                  <FiRefreshCw className="mr-1" /> Try Again
+                </button>
               </div>
             )}
           </div>
@@ -163,6 +200,11 @@ const QRCodeModal = ({ url, onClose }) => {
           
           <div className="text-center text-sm text-dark-500 mt-4">
             <p>Scan this QR code to access the shortened URL</p>
+            {url.is_ab_test && (
+              <p className="mt-1 text-primary-600">
+                <FiGitBranch className="inline mr-1" /> This URL is part of an A/B test
+              </p>
+            )}
           </div>
         </div>
       </motion.div>

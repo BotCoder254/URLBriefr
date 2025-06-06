@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiLink, FiCopy, FiTrash2, FiEdit, FiPlus, FiX, FiAlertCircle, FiCheckCircle, FiExternalLink, FiSearch, FiBarChart2, FiToggleLeft, FiToggleRight, FiCalendar, FiClock, FiEye, FiGrid } from 'react-icons/fi';
+import { FiLink, FiCopy, FiTrash2, FiEdit, FiPlus, FiX, FiAlertCircle, FiCheckCircle, FiExternalLink, FiSearch, FiBarChart2, FiToggleLeft, FiToggleRight, FiCalendar, FiClock, FiEye, FiGrid, FiGitBranch } from 'react-icons/fi';
 import urlService from '../services/urlService';
 import QRCodeModal from '../components/url/QRCodeModal';
+import ABTestingForm from '../components/url/ABTestingForm';
 
 const DashboardPage = () => {
   const [urls, setUrls] = useState([]);
@@ -28,7 +29,12 @@ const DashboardPage = () => {
     custom_code: '',
     title: '',
     expiration_days: '',
-    is_active: true
+    is_active: true,
+    is_ab_test: false,
+    variants: [
+      { name: 'Variant A', destination_url: '', weight: 50 },
+      { name: 'Variant B', destination_url: '', weight: 50 }
+    ]
   });
   
   // Expiration form state
@@ -81,6 +87,21 @@ const DashboardPage = () => {
       errors.original_url = 'URL is required';
     }
     
+    // If A/B testing is enabled, validate variants
+    if (newUrl.is_ab_test) {
+      // Check if all variants have destination URLs
+      const emptyVariants = newUrl.variants.filter(v => !v.destination_url);
+      if (emptyVariants.length > 0) {
+        errors.variants = 'All variants must have destination URLs';
+      }
+      
+      // Check if weights sum to 100
+      const totalWeight = newUrl.variants.reduce((sum, v) => sum + Number(v.weight), 0);
+      if (totalWeight !== 100) {
+        errors.variants = `Variant weights must sum to 100% (current: ${totalWeight}%)`;
+      }
+    }
+    
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       return;
@@ -94,7 +115,7 @@ const DashboardPage = () => {
       
       // Clean up empty fields
       Object.keys(urlData).forEach(key => {
-        if (!urlData[key] && key !== 'is_active') delete urlData[key];
+        if (!urlData[key] && key !== 'is_active' && key !== 'is_ab_test') delete urlData[key];
       });
       
       // Ensure URL has http/https
@@ -105,6 +126,22 @@ const DashboardPage = () => {
       // Convert expiration_days to number if present
       if (urlData.expiration_days) {
         urlData.expiration_days = parseInt(urlData.expiration_days, 10);
+      }
+      
+      // If A/B testing is not enabled, remove variants
+      if (!urlData.is_ab_test) {
+        delete urlData.variants;
+      } else {
+        // Ensure weights are numbers
+        urlData.variants = urlData.variants.map(variant => ({
+          ...variant,
+          weight: Number(variant.weight)
+        }));
+        
+        // Set first variant's destination URL to original URL if empty
+        if (!urlData.variants[0].destination_url) {
+          urlData.variants[0].destination_url = urlData.original_url;
+        }
       }
       
       const response = await urlService.createUrl(urlData);
@@ -118,7 +155,12 @@ const DashboardPage = () => {
         custom_code: '',
         title: '',
         expiration_days: '',
-        is_active: true
+        is_active: true,
+        is_ab_test: false,
+        variants: [
+          { name: 'Variant A', destination_url: '', weight: 50 },
+          { name: 'Variant B', destination_url: '', weight: 50 }
+        ]
       });
       
       setCreateSuccess(true);
@@ -131,7 +173,8 @@ const DashboardPage = () => {
       console.error('Error creating URL:', err);
       setFormErrors({
         submit: err.response?.data?.original_url?.[0] || 
-                err.response?.data?.custom_code?.[0] || 
+                err.response?.data?.custom_code?.[0] ||
+                err.response?.data?.variants?.[0] ||
                 'Failed to create URL. Please try again.'
       });
     } finally {
@@ -199,18 +242,33 @@ const DashboardPage = () => {
   
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setNewUrl(prev => ({ 
-      ...prev, 
-      [name]: type === 'checkbox' ? checked : value 
+    setNewUrl(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
     }));
     
-    // Clear error for this field if it exists
+    // Clear form errors
     if (formErrors[name]) {
-      setFormErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: null
+      }));
+    }
+    
+    // If enabling A/B testing, set first variant's destination URL to the original URL
+    if (name === 'is_ab_test' && checked && newUrl.original_url) {
+      const validatedUrl = newUrl.original_url.startsWith('http') ? 
+        newUrl.original_url : 
+        `https://${newUrl.original_url}`;
+        
+      setNewUrl(prev => ({
+        ...prev,
+        is_ab_test: checked,
+        variants: [
+          { ...prev.variants[0], destination_url: validatedUrl },
+          { ...prev.variants[1] }
+        ]
+      }));
     }
   };
   
@@ -805,6 +863,48 @@ const DashboardPage = () => {
                     Active (URL is immediately accessible)
                   </label>
                 </div>
+                
+                <div className="flex items-center">
+                  <input
+                    id="is_ab_test"
+                    name="is_ab_test"
+                    type="checkbox"
+                    checked={newUrl.is_ab_test}
+                    onChange={handleFormChange}
+                    className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                  />
+                  <label htmlFor="is_ab_test" className="ml-2 block text-sm text-dark-700">
+                    Enable A/B Testing
+                  </label>
+                </div>
+                
+                {/* A/B Testing Form */}
+                <AnimatePresence>
+                  {newUrl.is_ab_test && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-4 pt-3 border-t border-gray-200"
+                      style={{ overflow: 'visible' }}
+                    >
+                      {formErrors.variants && (
+                        <div className="mb-3 bg-red-50 text-red-700 p-2 rounded-lg text-sm">
+                          <FiAlertCircle className="inline mr-1" /> {formErrors.variants}
+                        </div>
+                      )}
+                      <ABTestingForm 
+                        variants={newUrl.variants} 
+                        setVariants={(updatedVariants) => {
+                          setNewUrl(prev => ({
+                            ...prev,
+                            variants: updatedVariants
+                          }));
+                        }} 
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
                 
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
