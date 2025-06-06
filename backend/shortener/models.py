@@ -10,6 +10,25 @@ def generate_short_code(length=6):
     return ''.join(random.choice(chars) for _ in range(length))
 
 
+class Tag(models.Model):
+    """Model to store tags for organizing URLs."""
+    name = models.CharField(max_length=50)
+    color = models.CharField(max_length=20, default="#3B82F6")  # Default blue color
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='tags'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('name', 'user')
+        ordering = ['name']
+    
+    def __str__(self):
+        return self.name
+
+
 class ShortenedURL(models.Model):
     """Model to store shortened URLs."""
     
@@ -38,6 +57,12 @@ class ShortenedURL(models.Model):
     
     # A/B testing flag
     is_ab_test = models.BooleanField(default=False)
+    
+    # Tags for organization
+    tags = models.ManyToManyField(Tag, related_name='urls', blank=True)
+    
+    # Folder/organization
+    folder = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
         return f"{self.short_code} -> {self.original_url[:50]}..."

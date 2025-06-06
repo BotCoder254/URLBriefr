@@ -49,6 +49,22 @@ const urlService = {
         }
       }
       
+      // For folder creation, ensure we're sending a minimal payload
+      if (urlData.folder && urlData.title === 'Temporary URL for folder creation') {
+        // Simplified payload for folder creation - avoid tag_ids completely
+        const folderPayload = {
+          original_url: urlData.original_url,
+          title: urlData.title,
+          folder: urlData.folder,
+          is_active: false
+        };
+        
+        console.log('Creating folder with payload:', folderPayload);
+        const response = await api.post('/urls/', folderPayload);
+        return response.data;
+      }
+      
+      // Regular URL creation
       const response = await api.post('/urls/', urlData);
       return response.data;
     } catch (error) {
@@ -58,8 +74,25 @@ const urlService = {
   },
   
   // Get all URLs for the current user
-  getUserUrls: async () => {
-    const response = await api.get('/urls/');
+  getUserUrls: async (filters = {}) => {
+    // Convert filters to query parameters
+    const params = new URLSearchParams();
+    
+    // Add filters to query params
+    Object.keys(filters).forEach(key => {
+      if (Array.isArray(filters[key])) {
+        filters[key].forEach(value => {
+          params.append(key, value);
+        });
+      } else if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
+        params.append(key, filters[key]);
+      }
+    });
+    
+    const queryString = params.toString();
+    const url = queryString ? `/urls/?${queryString}` : '/urls/';
+    
+    const response = await api.get(url);
     return response.data;
   },
   
@@ -117,8 +150,13 @@ const urlService = {
   
   // Delete a URL
   deleteUrl: async (id) => {
-    const response = await api.delete(`/urls/${id}/`);
-    return response.data;
+    try {
+      const response = await api.delete(`/urls/${id}/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting URL:', error.response?.data || error.message);
+      throw error;
+    }
   },
   
   // Get URL statistics
@@ -221,6 +259,74 @@ const urlService = {
       return response.data;
     } catch (error) {
       console.error('Error getting A/B testing stats:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Tag management
+  
+  // Get all tags for the current user
+  getTags: async () => {
+    try {
+      const response = await api.get('/tags/');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting tags:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Create a new tag
+  createTag: async (tagData) => {
+    try {
+      const response = await api.post('/tags/', tagData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating tag:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Update a tag
+  updateTag: async (id, tagData) => {
+    try {
+      const response = await api.patch(`/tags/${id}/`, tagData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating tag:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Delete a tag
+  deleteTag: async (id) => {
+    try {
+      const response = await api.delete(`/tags/${id}/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting tag:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Get all URLs with a specific tag
+  getUrlsByTag: async (tagId) => {
+    try {
+      const response = await api.get(`/tags/${tagId}/urls/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting URLs by tag:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Get all folders used by the user
+  getFolders: async () => {
+    try {
+      const response = await api.get('/urls/folders/');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting folders:', error.response?.data || error.message);
       throw error;
     }
   }

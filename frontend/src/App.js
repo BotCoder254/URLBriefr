@@ -19,6 +19,7 @@ import ProfilePage from './pages/ProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
 import RedirectPage from './pages/RedirectPage';
 import ABTestingPage from './pages/ABTestingPage';
+import OrganizePage from './pages/OrganizePage';
 
 function App() {
   return (
@@ -95,6 +96,17 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <ProfilePage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/organize"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <OrganizePage />
                 </Layout>
               </ProtectedRoute>
             }

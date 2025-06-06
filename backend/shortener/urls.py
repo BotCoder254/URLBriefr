@@ -1,9 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ShortenedURLViewSet, redirect_to_original, generate_qr_code
+from .views import ShortenedURLViewSet, TagViewSet, redirect_to_original, generate_qr_code
 
 router = DefaultRouter()
 router.register(r'urls', ShortenedURLViewSet, basename='url')
+router.register(r'tags', TagViewSet, basename='tag')
 
 # API endpoints
 api_urlpatterns = [

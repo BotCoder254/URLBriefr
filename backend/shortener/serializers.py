@@ -1,9 +1,35 @@
 from rest_framework import serializers
-from .models import ShortenedURL, ABTestVariant
+from .models import ShortenedURL, ABTestVariant, Tag
 from analytics.models import ClickEvent
 from django.conf import settings
 from django.utils import timezone
 from datetime import datetime, timedelta
+
+class TagSerializer(serializers.ModelSerializer):
+    """Serializer for tags."""
+    url_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Tag
+        fields = ['id', 'name', 'color', 'created_at', 'url_count']
+        read_only_fields = ['created_at', 'url_count']
+    
+    def get_url_count(self, obj):
+        """Get the number of URLs with this tag."""
+        return obj.urls.count()
+    
+    def create(self, validated_data):
+        """Create a new tag."""
+        user = self.context['request'].user
+        
+        # Check if tag with same name already exists for this user
+        if Tag.objects.filter(user=user, name=validated_data['name']).exists():
+            raise serializers.ValidationError({
+                'name': 'You already have a tag with this name.'
+            })
+        
+        validated_data['user'] = user
+        return super().create(validated_data)
 
 class ABTestVariantSerializer(serializers.ModelSerializer):
     """Serializer for A/B test variants."""
@@ -31,6 +57,13 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
     clicks_count = serializers.SerializerMethodField()
     qr_code_url = serializers.SerializerMethodField()
     variants = ABTestVariantSerializer(many=True, read_only=True)
+    tags = TagSerializer(many=True, read_only=True)
+    tag_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Tag.objects.all(),
+        many=True,
+        write_only=True,
+        required=False
+    )
     
     class Meta:
         model = ShortenedURL
@@ -39,7 +72,7 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             'created_at', 'last_accessed', 'expires_at', 'user',
             'access_count', 'title', 'is_custom_code', 'is_active',
             'is_expired', 'clicks_count', 'qr_code_url', 'is_ab_test',
-            'variants'
+            'variants', 'tags', 'tag_ids', 'folder'
         ]
         read_only_fields = [
             'id', 'created_at', 'last_accessed',
@@ -47,7 +80,8 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             'clicks_count', 'qr_code_url'
         ]
         extra_kwargs = {
-            'user': {'required': False}
+            'user': {'required': False},
+            'folder': {'required': False}
         }
     
     def get_full_short_url(self, obj):
@@ -74,8 +108,35 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
         if user.is_authenticated:
             validated_data['user'] = user
         
-        return super().create(validated_data)
+        # Handle tag_ids separately
+        tag_ids = validated_data.pop('tag_ids', None)
+        
+        # Create the URL
+        shortened_url = super().create(validated_data)
+        
+        # Set tags if provided
+        if tag_ids is not None:
+            # Handle empty list case explicitly
+            if len(tag_ids) > 0:
+                shortened_url.tags.set(tag_ids)
+            else:
+                # Clear any existing tags
+                shortened_url.tags.clear()
+            
+        return shortened_url
 
+    def validate_tag_ids(self, value):
+        """Validate that the user can only use their own tags."""
+        user = self.context['request'].user
+        
+        if not user.is_authenticated:
+            raise serializers.ValidationError("You must be logged in to use tags.")
+        
+        for tag in value:
+            if tag.user != user:
+                raise serializers.ValidationError(f"Tag '{tag.name}' does not belong to you.")
+            
+        return value
 
 class CreateShortenedURLSerializer(serializers.ModelSerializer):
     """Serializer for creating shortened URLs with less fields."""
@@ -96,12 +157,28 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
         required=False
     )
     
+    # Tag fields
+    tag_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Tag.objects.all(),
+        many=True,
+        required=False,
+        write_only=True
+    )
+    
+    # New tags to create
+    new_tags = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        write_only=True
+    )
+    
     class Meta:
         model = ShortenedURL
         fields = [
             'original_url', 'custom_code', 'title', 
             'expiration_days', 'expiration_date', 'expiration_type',
-            'is_active', 'is_ab_test', 'variants'
+            'is_active', 'is_ab_test', 'variants', 'tag_ids',
+            'new_tags', 'folder'
         ]
         
     def validate(self, data):
@@ -129,6 +206,10 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
         original_url = data.get('original_url')
         request = self.context.get('request')
         
+        # If this is a folder creation (temporary URL), skip the duplicate check
+        if data.get('title') == 'Temporary URL for folder creation':
+            return data
+            
         if request and request.user.is_authenticated and original_url:
             # Don't check for duplicates if this is an A/B test
             if not data.get('is_ab_test', False):
@@ -180,6 +261,39 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'variants': f'The sum of all variant weights must be 100. Current sum: {total_weight}'
                 })
+        
+        # Validate tags - skip validation for folder creation URLs
+        if 'tag_ids' in data and data.get('title') != 'Temporary URL for folder creation':
+            user = request.user if request else None
+            if not user or not user.is_authenticated:
+                raise serializers.ValidationError({
+                    'tag_ids': 'You must be logged in to use tags.'
+                })
+            
+            for tag in data['tag_ids']:
+                if tag.user != user:
+                    raise serializers.ValidationError({
+                        'tag_ids': f"Tag '{tag.name}' does not belong to you."
+                    })
+        
+        # Validate new tags - skip validation for folder creation URLs
+        if 'new_tags' in data and data.get('title') != 'Temporary URL for folder creation':
+            user = request.user if request else None
+            if not user or not user.is_authenticated:
+                raise serializers.ValidationError({
+                    'new_tags': 'You must be logged in to create tags.'
+                })
+            
+            for tag_data in data.get('new_tags', []):
+                if not tag_data.get('name'):
+                    raise serializers.ValidationError({
+                        'new_tags': 'Tag name is required.'
+                    })
+                
+                if Tag.objects.filter(user=user, name=tag_data['name']).exists():
+                    raise serializers.ValidationError({
+                        'new_tags': f"You already have a tag named '{tag_data['name']}'."
+                    })
                 
         return data
         
@@ -190,6 +304,12 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
         # Extract A/B testing variants
         is_ab_test = validated_data.pop('is_ab_test', False)
         variants_data = validated_data.pop('variants', [])
+        
+        # Extract tag data - handle empty list case explicitly
+        tag_ids = []
+        if 'tag_ids' in validated_data:
+            tag_ids = validated_data.pop('tag_ids')
+        new_tags_data = validated_data.pop('new_tags', [])
         
         # Process custom code if provided
         custom_code = validated_data.pop('custom_code', None)
@@ -234,5 +354,21 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
                     weight=variant_data.get('weight', 50),
                     name=variant_data.get('name', 'Variant')
                 )
+        
+        # Add existing tags
+        if tag_ids and user and user.is_authenticated:
+            # Handle empty list case explicitly
+            if len(tag_ids) > 0:
+                shortened_url.tags.set(tag_ids)
+        
+        # Create and add new tags
+        if new_tags_data and user and user.is_authenticated:
+            for tag_data in new_tags_data:
+                tag, created = Tag.objects.get_or_create(
+                    user=user,
+                    name=tag_data['name'],
+                    defaults={'color': tag_data.get('color', '#3B82F6')}
+                )
+                shortened_url.tags.add(tag)
         
         return shortened_url 

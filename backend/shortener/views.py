@@ -1,9 +1,10 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view, permission_classes
-from .models import ShortenedURL
-from .serializers import ShortenedURLSerializer, CreateShortenedURLSerializer
+from django_filters.rest_framework import DjangoFilterBackend
+from .models import ShortenedURL, Tag
+from .serializers import ShortenedURLSerializer, CreateShortenedURLSerializer, TagSerializer
 from analytics.models import ClickEvent
 from django.http import HttpResponseRedirect, HttpResponse
 from django.utils import timezone
@@ -16,10 +17,34 @@ import base64
 import requests
 import random
 
+
+class TagViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing tags."""
+    serializer_class = TagSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        """Get tags for the current user."""
+        return Tag.objects.filter(user=self.request.user)
+    
+    @action(detail=True, methods=['get'])
+    def urls(self, request, pk=None):
+        """Get all URLs with this tag."""
+        tag = self.get_object()
+        urls = tag.urls.all()
+        serializer = ShortenedURLSerializer(urls, many=True, context={'request': request})
+        return Response(serializer.data)
+
+
 class ShortenedURLViewSet(viewsets.ModelViewSet):
     """ViewSet for shortened URLs."""
     
     serializer_class = ShortenedURLSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_active', 'is_ab_test', 'folder']
+    search_fields = ['short_code', 'original_url', 'title']
+    ordering_fields = ['created_at', 'access_count', 'last_accessed']
+    ordering = ['-created_at']
     
     def get_queryset(self):
         """Get the queryset based on user role."""
@@ -27,14 +52,27 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
         
         # Admin users can see all URLs
         if user.is_superuser or (hasattr(user, 'is_admin') and user.is_admin):
-            return ShortenedURL.objects.all()
+            queryset = ShortenedURL.objects.all()
         
         # Authenticated users can see their own URLs
-        if user.is_authenticated:
-            return ShortenedURL.objects.filter(user=user)
+        elif user.is_authenticated:
+            queryset = ShortenedURL.objects.filter(user=user)
         
         # Guest users can't see any URLs through API
-        return ShortenedURL.objects.none()
+        else:
+            return ShortenedURL.objects.none()
+        
+        # Filter by tags if provided
+        tags = self.request.query_params.getlist('tag')
+        if tags:
+            queryset = queryset.filter(tags__name__in=tags).distinct()
+        
+        # Filter by tag_ids if provided
+        tag_ids = self.request.query_params.getlist('tag_id')
+        if tag_ids:
+            queryset = queryset.filter(tags__id__in=tag_ids).distinct()
+            
+        return queryset
     
     def get_permissions(self):
         """Get permissions based on action."""
@@ -65,6 +103,22 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
             'total_clicks': total_clicks,
             'active_urls': urls.filter(is_active=True).count(),
         })
+    
+    @action(detail=False, methods=['get'])
+    def folders(self, request):
+        """Get all folders used by the user."""
+        user = request.user
+        if not user.is_authenticated:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+        
+        folders = ShortenedURL.objects.filter(
+            user=user,
+            folder__isnull=False
+        ).exclude(
+            folder=''
+        ).values_list('folder', flat=True).distinct()
+        
+        return Response(list(folders))
 
 
 @api_view(['GET'])

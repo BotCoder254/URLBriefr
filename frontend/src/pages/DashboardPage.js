@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiLink, FiCopy, FiTrash2, FiEdit, FiPlus, FiX, FiAlertCircle, FiCheckCircle, FiExternalLink, FiSearch, FiBarChart2, FiToggleLeft, FiToggleRight, FiCalendar, FiClock, FiEye, FiGrid, FiGitBranch } from 'react-icons/fi';
+import { FiLink, FiCopy, FiTrash2, FiEdit, FiPlus, FiX, FiAlertCircle, FiCheckCircle, FiExternalLink, FiSearch, FiBarChart2, FiToggleLeft, FiToggleRight, FiCalendar, FiClock, FiEye, FiGrid, FiGitBranch, FiTag, FiFolder, FiFilter, FiSettings } from 'react-icons/fi';
 import urlService from '../services/urlService';
 import QRCodeModal from '../components/url/QRCodeModal';
 import ABTestingForm from '../components/url/ABTestingForm';
+import TagSelector from '../components/url/TagSelector';
+import FolderSelector from '../components/url/FolderSelector';
+import TagBadge from '../components/url/TagBadge';
+import TagManagementModal from '../components/url/TagManagementModal';
+import FolderManagementModal from '../components/url/FolderManagementModal';
 
 const DashboardPage = () => {
   const [urls, setUrls] = useState([]);
@@ -15,6 +20,8 @@ const DashboardPage = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showExpirationModal, setShowExpirationModal] = useState(false);
   const [showQRCodeModal, setShowQRCodeModal] = useState(false);
+  const [showTagManagementModal, setShowTagManagementModal] = useState(false);
+  const [showFolderManagementModal, setShowFolderManagementModal] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [copied, setCopied] = useState(null);
@@ -34,7 +41,9 @@ const DashboardPage = () => {
     variants: [
       { name: 'Variant A', destination_url: '', weight: 50 },
       { name: 'Variant B', destination_url: '', weight: 50 }
-    ]
+    ],
+    folder: '',
+    tag_ids: []
   });
   
   // Expiration form state
@@ -53,6 +62,11 @@ const DashboardPage = () => {
   const [createSuccess, setCreateSuccess] = useState(false);
   const [expirationUpdating, setExpirationUpdating] = useState(false);
   
+  // Filter state
+  const [filterTags, setFilterTags] = useState([]);
+  const [filterFolder, setFilterFolder] = useState('');
+  const [activeFilters, setActiveFilters] = useState(false);
+  
   // Get tomorrow's date in YYYY-MM-DD format for min date in date picker
   const getTomorrowDate = () => {
     const tomorrow = new Date();
@@ -64,10 +78,38 @@ const DashboardPage = () => {
     fetchUrls();
   }, []);
   
+  useEffect(() => {
+    // Apply filters when search term changes, but with a small delay
+    const delayDebounceFn = setTimeout(() => {
+      fetchUrls();
+    }, 500);
+    
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
+  
   const fetchUrls = async () => {
     try {
       setLoading(true);
-      const data = await urlService.getUserUrls();
+      
+      // Build filters object
+      const filters = {};
+      
+      // Add tag filters
+      if (filterTags.length > 0) {
+        filters.tag_id = filterTags.map(tag => tag.id);
+      }
+      
+      // Add folder filter
+      if (filterFolder) {
+        filters.folder = filterFolder;
+      }
+      
+      // Add search term filter
+      if (searchTerm) {
+        filters.search = searchTerm;
+      }
+      
+      const data = await urlService.getUserUrls(filters);
       setUrls(data);
       setError(null);
     } catch (err) {
@@ -160,7 +202,9 @@ const DashboardPage = () => {
         variants: [
           { name: 'Variant A', destination_url: '', weight: 50 },
           { name: 'Variant B', destination_url: '', weight: 50 }
-        ]
+        ],
+        folder: '',
+        tag_ids: []
       });
       
       setCreateSuccess(true);
@@ -504,13 +548,22 @@ const DashboardPage = () => {
                 Manage all your shortened URLs in one place
               </p>
             </div>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="btn btn-primary flex items-center space-x-2"
-            >
-              <FiPlus />
-              <span>Create URL</span>
-            </button>
+            <div className="flex space-x-3">
+              <Link
+                to="/organize"
+                className="btn btn-outline flex items-center space-x-2"
+              >
+                <FiTag />
+                <span>Organize</span>
+              </Link>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="btn btn-primary flex items-center space-x-2"
+              >
+                <FiPlus />
+                <span>Create URL</span>
+              </button>
+            </div>
           </motion.div>
           
           {error && (
@@ -574,8 +627,101 @@ const DashboardPage = () => {
                     className="input pl-10"
                   />
                 </div>
+                
+                {/* Filter button */}
+                <button
+                  onClick={() => setActiveFilters(!activeFilters)}
+                  className={`btn ${activeFilters ? 'btn-primary' : 'btn-outline'} flex items-center`}
+                >
+                  <FiFilter className="mr-1" />
+                  <span>Filters</span>
+                  {(filterTags.length > 0 || filterFolder) && (
+                    <span className="ml-1 bg-primary-700 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                      {filterTags.length + (filterFolder ? 1 : 0)}
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
+            
+            {/* Advanced filters section */}
+            <AnimatePresence>
+              {activeFilters && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-6 border-t border-gray-100 pt-4"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Tag filter */}
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-medium text-dark-700">
+                          <FiTag className="inline mr-1" /> Filter by Tags
+                        </label>
+                        <button 
+                          type="button"
+                          onClick={() => setShowTagManagementModal(true)}
+                          className="text-xs text-primary-600 hover:text-primary-700 flex items-center"
+                        >
+                          <FiSettings className="mr-1 h-3 w-3" /> Manage Tags
+                        </button>
+                      </div>
+                      <TagSelector 
+                        selectedTags={filterTags} 
+                        onChange={setFilterTags} 
+                        allowCreate={false}
+                        allowEdit={false}
+                      />
+                    </div>
+                    
+                    {/* Folder filter */}
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-medium text-dark-700">
+                          <FiFolder className="inline mr-1" /> Filter by Folder
+                        </label>
+                        <button 
+                          type="button"
+                          onClick={() => setShowFolderManagementModal(true)}
+                          className="text-xs text-primary-600 hover:text-primary-700 flex items-center"
+                        >
+                          <FiSettings className="mr-1 h-3 w-3" /> Manage Folders
+                        </button>
+                      </div>
+                      <FolderSelector 
+                        selectedFolder={filterFolder} 
+                        onChange={setFilterFolder} 
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end mt-4 space-x-3">
+                    <button
+                      onClick={() => {
+                        setFilterTags([]);
+                        setFilterFolder('');
+                        setActiveFilters(false);
+                        fetchUrls();
+                      }}
+                      className="btn btn-outline"
+                    >
+                      Clear Filters
+                    </button>
+                    <button
+                      onClick={() => {
+                        fetchUrls();
+                        setActiveFilters(false);
+                      }}
+                      className="btn btn-primary"
+                    >
+                      Apply Filters
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
             
             {urls.length === 0 ? (
               <div className="text-center py-10">
@@ -606,6 +752,12 @@ const DashboardPage = () => {
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
                         Clicks
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                        Tags
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                        Folder
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
                         Expiration
@@ -670,6 +822,34 @@ const DashboardPage = () => {
                           <Link to={`/analytics/${url.id}`} className="text-primary-600 hover:underline">
                             {url.access_count}
                           </Link>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-500">
+                          <div className="flex flex-wrap gap-1">
+                            {url.tags && url.tags.length > 0 ? (
+                              <>
+                                {url.tags.slice(0, 2).map(tag => (
+                                  <TagBadge key={tag.id} tag={tag} size="sm" />
+                                ))}
+                                {url.tags.length > 2 && (
+                                  <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full text-xs">
+                                    +{url.tags.length - 2}
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-500">
+                          {url.folder ? (
+                            <div className="flex items-center">
+                              <FiFolder className="mr-1 text-gray-500" />
+                              <span className="bg-gray-100 px-2 py-0.5 rounded-md text-sm">{url.folder}</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">Not in a folder</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {url.expires_at ? (
@@ -906,6 +1086,59 @@ const DashboardPage = () => {
                   )}
                 </AnimatePresence>
                 
+                {/* Organization section */}
+                <div className="mt-4 pt-3 border-t border-gray-200">
+                  <h3 className="text-md font-medium text-dark-800 mb-3">Organization</h3>
+                  
+                  <div className="space-y-3">
+                    {/* Folder selection */}
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-xs font-medium text-dark-700">
+                          <FiFolder className="inline mr-1" /> Folder (Optional)
+                        </label>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            // Save current form state and open folder management modal
+                            setShowFolderManagementModal(true);
+                          }}
+                          className="text-xs text-primary-600 hover:text-primary-700 flex items-center"
+                        >
+                          <FiSettings className="mr-1 h-3 w-3" /> Manage
+                        </button>
+                      </div>
+                      <FolderSelector
+                        selectedFolder={newUrl.folder}
+                        onChange={(folder) => setNewUrl(prev => ({ ...prev, folder }))}
+                      />
+                    </div>
+                    
+                    {/* Tags selection */}
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-xs font-medium text-dark-700">
+                          <FiTag className="inline mr-1" /> Tags (Optional)
+                        </label>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            // Save current form state and open tag management modal
+                            setShowTagManagementModal(true);
+                          }}
+                          className="text-xs text-primary-600 hover:text-primary-700 flex items-center"
+                        >
+                          <FiSettings className="mr-1 h-3 w-3" /> Manage
+                        </button>
+                      </div>
+                      <TagSelector
+                        selectedTags={newUrl.tag_ids}
+                        onChange={(tags) => setNewUrl(prev => ({ ...prev, tag_ids: tags }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+                
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
                     type="button"
@@ -1081,6 +1314,33 @@ const DashboardPage = () => {
                 <div>
                   <p className="text-sm text-dark-500 mb-1">Last Accessed</p>
                   <p>{selectedUrl.last_accessed ? formatDateTime(selectedUrl.last_accessed) : 'Never'}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <p className="text-sm text-dark-500 mb-1">Folder</p>
+                  {selectedUrl.folder ? (
+                    <div className="flex items-center">
+                      <FiFolder className="mr-1 text-gray-500" />
+                      <span className="bg-gray-100 px-2 py-0.5 rounded-md text-sm">{selectedUrl.folder}</span>
+                    </div>
+                  ) : (
+                    <span className="text-gray-400">Not in a folder</span>
+                  )}
+                </div>
+                
+                <div>
+                  <p className="text-sm text-dark-500 mb-1">Tags</p>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedUrl.tags && selectedUrl.tags.length > 0 ? (
+                      selectedUrl.tags.map(tag => (
+                        <TagBadge key={tag.id} tag={tag} size="sm" />
+                      ))
+                    ) : (
+                      <span className="text-gray-400">No tags</span>
+                    )}
+                  </div>
                 </div>
               </div>
               
@@ -1276,6 +1536,24 @@ const DashboardPage = () => {
           />
         )}
       </AnimatePresence>
+      
+      {/* Tag Management Modal */}
+      <TagManagementModal 
+        isOpen={showTagManagementModal} 
+        onClose={() => {
+          setShowTagManagementModal(false);
+          fetchUrls(); // Refresh data after managing tags
+        }}
+      />
+      
+      {/* Folder Management Modal */}
+      <FolderManagementModal 
+        isOpen={showFolderManagementModal} 
+        onClose={() => {
+          setShowFolderManagementModal(false);
+          fetchUrls(); // Refresh data after managing folders
+        }}
+      />
     </div>
   );
 };
