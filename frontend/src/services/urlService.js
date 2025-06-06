@@ -239,42 +239,125 @@ const urlService = {
   
   // Set URL expiration
   setUrlExpiration: async (id, expirationType, expirationValue) => {
-    let urlData = {};
-    
-    if (expirationType === 'days') {
-      urlData = {
-        expiration_type: 'days',
-        expiration_days: expirationValue
-      };
-      console.log('Setting expiration in days:', expirationValue);
-    } else if (expirationType === 'date') {
-      urlData = {
-        expiration_type: 'date',
-        expiration_date: expirationValue
-      };
-      console.log('Setting expiration to date:', expirationValue);
-    } else {
-      // Remove expiration
-      urlData = {
-        expiration_type: 'none',
-        expires_at: null
-      };
-      console.log('Removing expiration date');
-    }
-    
     try {
-      console.log('Sending expiration update request for URL ID:', id, 'with data:', urlData);
-      const response = await api.patch(`/urls/${id}/`, urlData);
-      console.log('Expiration update response:', response.data);
+      console.log(`Starting URL expiration update for ID ${id}, type: ${expirationType}, value:`, expirationValue);
       
-      // Verify that the response contains an expiration date if we set one
-      if (expirationType !== 'none' && !response.data.expires_at) {
-        console.warn('Warning: URL expiration was set but response has no expires_at field:', response.data);
+      // Prepare simple data for the specialized endpoint
+      let updateData = {
+        expiration_type: expirationType
+      };
+      
+      // Add the appropriate expiration value field
+      if (expirationType === 'days') {
+        const days = Number(expirationValue);
+        updateData.expiration_days = days; // Ensure it's a number
+        console.log('Setting expiration in days:', days);
+        
+        // For days, include a calculated date as well to ensure expires_at is set
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + days);
+        updateData.expiration_date = futureDate.toISOString().split('.')[0] + 'Z';
+        console.log('Also including calculated date:', updateData.expiration_date);
+      } else if (expirationType === 'date') {
+        // Format date for API if it's a string
+        let formattedDate;
+        if (typeof expirationValue === 'string') {
+          // Ensure we have a valid date string in ISO format
+          const dateObj = new Date(expirationValue);
+          if (isNaN(dateObj.getTime())) {
+            throw new Error(`Invalid date: ${expirationValue}`);
+          }
+          formattedDate = dateObj.toISOString().split('.')[0] + 'Z';  // Ensure consistent ISO format
+        } else {
+          formattedDate = expirationValue;
+        }
+          
+        updateData.expiration_date = formattedDate;
+        console.log('Setting expiration to date:', formattedDate);
       } else {
-        console.log('New expiration date set:', response.data.expires_at);
+        // For 'none', we just need the expiration_type
+        console.log('Removing expiration date');
       }
       
-      return response.data;
+      // First get the current URL data to use as a base
+      console.log('Getting current URL data first');
+      const currentUrlResponse = await api.get(`/urls/${id}/`);
+      const currentUrl = currentUrlResponse.data;
+      
+      if (!currentUrl || !currentUrl.id) {
+        throw new Error(`Failed to get current URL with ID ${id}`);
+      }
+      
+      console.log('Current URL data:', currentUrl);
+      
+      // Merge current data with our update data to ensure all required fields are present
+      const completeUpdateData = { ...currentUrl, ...updateData };
+      console.log('Complete update data:', completeUpdateData);
+      
+      // Try the specialized endpoint for expiration updates
+      console.log('Sending to specialized expiration update endpoint');
+      let updatedUrl = null;
+      
+      try {
+        const response = await api.patch(`/urls/${id}/update_expiration/`, updateData);
+        console.log('Specialized endpoint response:', response.data);
+        
+        // Verify we have a valid response with expires_at field when expected
+        if (response.data && (expirationType === 'none' || response.data.expires_at !== undefined)) {
+          console.log('Valid response from specialized endpoint with expires_at:', 
+            response.data.expires_at ? response.data.expires_at : 'null (for none)');
+          updatedUrl = response.data;
+        } else {
+          console.warn('Incomplete response from specialized endpoint:', response.data);
+        }
+      } catch (specializedError) {
+        console.error('Error with specialized endpoint:', specializedError);
+      }
+      
+      // If specialized endpoint didn't work, try the regular update endpoint
+      if (!updatedUrl) {
+        console.log('Falling back to regular update endpoint');
+        try {
+          const updateResponse = await api.patch(`/urls/${id}/`, completeUpdateData);
+          console.log('Regular update response:', updateResponse.data);
+          updatedUrl = updateResponse.data;
+        } catch (regularError) {
+          console.error('Error with regular update endpoint:', regularError);
+        }
+      }
+      
+      // Always fetch the latest URL data to ensure we have all fields
+      console.log('Fetching latest URL data after update');
+      try {
+        const freshResponse = await api.get(`/urls/${id}/`);
+        const freshUrl = freshResponse.data;
+        console.log('Fresh URL data:', freshUrl);
+        
+        // Check if the expires_at field is as expected
+        if (expirationType === 'none') {
+          // For 'none', expires_at should be null
+          if (freshUrl.expires_at !== null) {
+            console.warn('Warning: expires_at should be null for "none" type, but got:', freshUrl.expires_at);
+          }
+        } else {
+          // For days/date, expires_at should be set
+          if (!freshUrl.expires_at) {
+            console.warn('Warning: expires_at should be set for', expirationType, 'but is null/undefined');
+          } else {
+            console.log('Successfully verified expires_at is set:', freshUrl.expires_at);
+          }
+        }
+        
+        // Always use the fresh data
+        return freshUrl;
+      } catch (freshError) {
+        console.error('Error fetching fresh URL data:', freshError);
+        // Fall back to the update response if we have it
+        if (updatedUrl) {
+          return updatedUrl;
+        }
+        throw freshError;
+      }
     } catch (error) {
       console.error('Error updating URL expiration:', error.response?.data || error.message);
       throw error;

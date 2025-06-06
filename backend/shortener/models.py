@@ -90,6 +90,9 @@ class ShortenedURL(models.Model):
         if not self.short_code:
             self.short_code = self.generate_unique_code()
         super().save(*args, **kwargs)
+        # Refresh from database to ensure we have the latest state
+        if 'update_fields' not in kwargs:
+            self.refresh_from_db()
     
     def generate_unique_code(self):
         """Generate a unique short code that doesn't exist yet."""
@@ -103,6 +106,34 @@ class ShortenedURL(models.Model):
         if self.expires_at:
             return timezone.now() > self.expires_at
         return False
+        
+    def update_expiration(self):
+        """Update expiration date based on expiration_type."""
+        if hasattr(self, 'expiration_type') and self.expiration_type:
+            if self.expiration_type == 'days' and hasattr(self, 'expiration_days'):
+                # Set expiration to N days from now
+                days = getattr(self, 'expiration_days', 0)
+                if days and int(days) > 0:
+                    self.expires_at = timezone.now() + timezone.timedelta(days=int(days))
+                    print(f"Set expiration to {days} days from now: {self.expires_at}")
+                else:
+                    self.expires_at = None
+            elif self.expiration_type == 'date' and hasattr(self, 'expiration_date'):
+                # Set to specific date
+                date = getattr(self, 'expiration_date', None)
+                if date:
+                    self.expires_at = date
+                    print(f"Set expiration to specific date: {self.expires_at}")
+                else:
+                    self.expires_at = None
+            elif self.expiration_type == 'none':
+                # No expiration
+                self.expires_at = None
+                print("Removed expiration date")
+            else:
+                print(f"Unknown expiration type: {self.expiration_type}")
+        else:
+            print(f"No expiration type provided: {getattr(self, 'expiration_type', 'None')}")
     
     def increment_counter(self):
         """Increment access counter and update last accessed time."""

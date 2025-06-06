@@ -68,6 +68,141 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'access_count', 'last_accessed']
     ordering = ['-created_at']
     
+    def update(self, request, *args, **kwargs):
+        """Custom update method to ensure all fields are returned properly."""
+        # Get the instance to be updated
+        partial = kwargs.pop('partial', True)  # Always use partial updates to avoid requiring all fields
+        instance = self.get_object()
+        
+        # For PATCH requests with expiration_type, get full URL data first
+        if request.method == 'PATCH' and 'expiration_type' in request.data:
+            print(f"Handling URL expiration update with expiration_type: {request.data.get('expiration_type')}")
+            
+            # For expiration updates, get the full URL data first
+            # and combine it with the update data to ensure all required fields are present
+            current_data = self.get_serializer(instance).data
+            
+            # Create a new data dictionary with all the current URL data
+            full_data = {**current_data}
+            
+            # Update with the request data (only the expiration fields)
+            for key in request.data:
+                full_data[key] = request.data[key]
+                
+            print(f"Using complete data for URL update with current fields + expiration changes")
+            
+            # Use the serializer with complete data
+            serializer = self.get_serializer(instance, data=full_data, partial=partial)
+        else:
+            # For non-expiration updates, use the request data directly
+            serializer = self.get_serializer(instance, data=request.data, partial=partial)
+            
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        # Force refresh from database to ensure all fields are up to date
+        instance.refresh_from_db()
+        
+        # Get a fresh instance to be extra sure
+        fresh_instance = self.get_object()
+        result_serializer = self.get_serializer(fresh_instance)
+        return Response(result_serializer.data)
+        
+    @action(detail=True, methods=['patch'])
+    def update_expiration(self, request, pk=None):
+        """Special endpoint just for updating URL expiration."""
+        instance = self.get_object()
+        original_instance_id = instance.id
+        print(f"Starting expiration update for URL ID {original_instance_id}")
+        
+        # Get current data to maintain all fields
+        current_data = self.get_serializer(instance).data
+        
+        # Update only expiration fields
+        expiration_type = request.data.get('expiration_type')
+        if expiration_type == 'days':
+            current_data['expiration_type'] = 'days'
+            current_data['expiration_days'] = request.data.get('expiration_days')
+            days = request.data.get('expiration_days')
+            # Directly calculate expiration date for logging
+            if days:
+                future_date = timezone.now() + timezone.timedelta(days=int(days))
+                print(f"Setting expiration to {days} days from now: {future_date}")
+        elif expiration_type == 'date':
+            current_data['expiration_type'] = 'date'
+            expiration_date = request.data.get('expiration_date')
+            current_data['expiration_date'] = expiration_date
+            print(f"Setting expiration to date: {expiration_date}")
+        else:
+            current_data['expiration_type'] = 'none'
+            print(f"Removing expiration (setting to none)")
+            
+        # Save original expiration for comparison
+        original_expires_at = instance.expires_at
+        
+        print(f"Using serializer to update URL...")
+        serializer = self.get_serializer(instance, data=current_data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        
+        # Before saving, if it's a date-based expiration, directly set the expires_at field
+        if expiration_type == 'date':
+            try:
+                date_value = request.data.get('expiration_date')
+                # Make sure we have a datetime object
+                from datetime import datetime
+                if isinstance(date_value, str):
+                    date_value = datetime.fromisoformat(date_value.replace('Z', '+00:00'))
+                instance.expires_at = date_value
+                print(f"Directly set expires_at to {instance.expires_at}")
+            except Exception as e:
+                print(f"Error directly setting date: {e}")
+            
+        # Perform the update
+        self.perform_update(serializer)
+        
+        # Force refresh from database to ensure all fields are updated
+        instance.refresh_from_db()
+        print(f"After refresh_from_db, expires_at is: {instance.expires_at}")
+        
+        # Get a completely fresh instance from a new database query
+        fresh_instance = ShortenedURL.objects.get(pk=instance.pk)
+        print(f"Fresh instance from database has expires_at: {fresh_instance.expires_at}")
+        
+        # If expires_at is still None but shouldn't be, try a direct database update
+        if expiration_type != 'none' and fresh_instance.expires_at is None:
+            print(f"WARNING: expires_at is still None after update. Trying direct database update.")
+            if expiration_type == 'days':
+                days = int(request.data.get('expiration_days', 0))
+                if days > 0:
+                    # Direct database update
+                    from django.utils import timezone
+                    future_date = timezone.now() + timezone.timedelta(days=days)
+                    ShortenedURL.objects.filter(pk=instance.pk).update(expires_at=future_date)
+                    print(f"Directly updated database with expires_at={future_date}")
+                    # Get fresh instance again
+                    fresh_instance = ShortenedURL.objects.get(pk=instance.pk)
+            elif expiration_type == 'date':
+                date_value = request.data.get('expiration_date')
+                if date_value:
+                    # Direct database update
+                    ShortenedURL.objects.filter(pk=instance.pk).update(expires_at=date_value)
+                    print(f"Directly updated database with expires_at={date_value}")
+                    # Get fresh instance again
+                    fresh_instance = ShortenedURL.objects.get(pk=instance.pk)
+        
+        # Return data from the completely fresh instance
+        result_serializer = self.get_serializer(fresh_instance)
+        
+        # Log the before and after state for debugging
+        print(f"URL ID {original_instance_id} expiration update complete:")
+        print(f"  - Original expires_at: {original_expires_at}")
+        print(f"  - New expires_at: {fresh_instance.expires_at}")
+        print(f"  - Has 'expires_at' in response: {'expires_at' in result_serializer.data}")
+        if 'expires_at' in result_serializer.data:
+            print(f"  - expires_at value in response: {result_serializer.data['expires_at']}")
+            
+        return Response(result_serializer.data)
+    
     def get_queryset(self):
         """Get the queryset based on user role."""
         user = self.request.user

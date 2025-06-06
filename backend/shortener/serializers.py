@@ -4,6 +4,10 @@ from analytics.models import ClickEvent
 from django.conf import settings
 from django.utils import timezone
 from datetime import datetime, timedelta
+import logging
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 class TagSerializer(serializers.ModelSerializer):
     """Serializer for tags."""
@@ -65,6 +69,14 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
         required=False
     )
     
+    # Add fields for expiration handling to make them not required in updates
+    expiration_type = serializers.ChoiceField(
+        choices=['none', 'days', 'date'],
+        required=False
+    )
+    expiration_days = serializers.IntegerField(required=False)
+    expiration_date = serializers.DateTimeField(required=False)
+    
     class Meta:
         model = ShortenedURL
         fields = [
@@ -74,7 +86,8 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             'is_expired', 'clicks_count', 'qr_code_url', 'is_ab_test',
             'variants', 'tags', 'tag_ids', 'folder',
             'use_redirect_page', 'redirect_page_type', 'redirect_delay',
-            'custom_redirect_message', 'brand_name', 'brand_logo_url'
+            'custom_redirect_message', 'brand_name', 'brand_logo_url',
+            'expiration_type', 'expiration_days', 'expiration_date'
         ]
         read_only_fields = [
             'id', 'created_at', 'last_accessed',
@@ -89,7 +102,12 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             'redirect_delay': {'required': False},
             'custom_redirect_message': {'required': False},
             'brand_name': {'required': False},
-            'brand_logo_url': {'required': False}
+            'brand_logo_url': {'required': False},
+            'original_url': {'required': False},
+            'short_code': {'required': False},
+            'title': {'required': False},
+            'is_active': {'required': False},
+            'is_ab_test': {'required': False}
         }
     
     def get_full_short_url(self, obj):
@@ -115,6 +133,18 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
         # Ensure tags are properly serialized
         if 'tags' in representation and representation['tags'] is None:
             representation['tags'] = []
+            
+        # Ensure expires_at is included and properly formatted
+        if hasattr(instance, 'expires_at'):
+            if instance.expires_at is not None:
+                # Format the date explicitly to ensure it's included
+                representation['expires_at'] = instance.expires_at.isoformat()
+            else:
+                # If it's None, make sure it's explicitly null in the response
+                representation['expires_at'] = None
+                
+        # Debug log
+        print(f"to_representation for URL ID {getattr(instance, 'id', 'unknown')}: expires_at in response: {'expires_at' in representation}")
             
         return representation
     
@@ -167,13 +197,24 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             if expiration_type == 'days':
                 expiration_days = validated_data.pop('expiration_days', None)
                 if expiration_days:
-                    instance.expires_at = timezone.now() + timedelta(days=expiration_days)
-                    print(f"Setting expiration date {expiration_days} days from now: {instance.expires_at}")
+                    # Calculate expiration date
+                    try:
+                        expiration_days = int(expiration_days)
+                        instance.expires_at = timezone.now() + timedelta(days=expiration_days)
+                        print(f"Setting expiration date {expiration_days} days from now: {instance.expires_at}")
+                    except (ValueError, TypeError) as e:
+                        print(f"Error setting expiration days: {e}")
             elif expiration_type == 'date':
                 expiration_date = validated_data.pop('expiration_date', None)
                 if expiration_date:
-                    instance.expires_at = expiration_date
-                    print(f"Setting expiration date to: {instance.expires_at}")
+                    try:
+                        # Ensure we have a valid date object
+                        if isinstance(expiration_date, str):
+                            expiration_date = datetime.fromisoformat(expiration_date.replace('Z', '+00:00'))
+                        instance.expires_at = expiration_date
+                        print(f"Setting expiration date to: {instance.expires_at}")
+                    except (ValueError, TypeError) as e:
+                        print(f"Error setting expiration date: {e} - Value was: {expiration_date}")
             elif expiration_type == 'none':
                 # Explicitly set expires_at to None for 'never' expiration
                 instance.expires_at = None
@@ -189,8 +230,21 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
             
+        # Save the instance
         instance.save()
-        return instance
+        
+        # Explicitly refresh the instance from the database
+        instance.refresh_from_db()
+        
+        # Get a fresh copy to ensure all fields are loaded properly
+        refreshed_instance = ShortenedURL.objects.get(pk=instance.pk)
+        
+        # Log the final instance data for debugging
+        logger.info(f"Updated URL (ID: {refreshed_instance.id}) - expires_at: {refreshed_instance.expires_at}")
+        print(f"Final expires_at value after update: {refreshed_instance.expires_at}")
+            
+        # Use the refreshed instance instead of the original
+        return refreshed_instance
 
 class CreateShortenedURLSerializer(serializers.ModelSerializer):
     """Serializer for creating shortened URLs with less fields."""

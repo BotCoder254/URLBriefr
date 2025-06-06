@@ -389,14 +389,28 @@ const DashboardPage = () => {
   
   // Format date string
   const formatDate = (dateString) => {
+    // Handle null, undefined, or empty string cases
     if (!dateString) return 'Never';
+    
     try {
+      // Parse date
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'Never';
-      return date.toLocaleDateString();
+      
+      // Check for invalid date
+      if (isNaN(date.getTime())) {
+        console.warn(`Invalid date format received: "${dateString}"`);
+        return 'Never';
+      }
+      
+      // Format date with more details
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
     } catch (err) {
-      console.error('Error formatting date:', err);
-      return 'Invalid Date';
+      console.error('Error formatting date:', err, 'for input:', dateString);
+      return 'Never';
     }
   };
   
@@ -409,8 +423,26 @@ const DashboardPage = () => {
   
   // Check if URL is expired
   const isExpired = (url) => {
+    // If no expiration date, it never expires
     if (!url.expires_at) return false;
-    return new Date(url.expires_at) < new Date();
+    
+    try {
+      // Parse the expiration date
+      const expiryDate = new Date(url.expires_at);
+      
+      // Check if date is valid
+      if (isNaN(expiryDate.getTime())) {
+        console.warn(`Invalid expiry date found: "${url.expires_at}" for URL ID ${url.id}`);
+        return false;
+      }
+      
+      // Compare with current date
+      const now = new Date();
+      return expiryDate < now;
+    } catch (err) {
+      console.error('Error checking if URL is expired:', err, 'for URL:', url);
+      return false;
+    }
   };
   
   // Get the status label for a URL
@@ -551,30 +583,94 @@ const DashboardPage = () => {
     setExpirationErrors({});
     
     try {
+      console.log(`Updating URL ID ${selectedUrl.id} expiration to ${expirationForm.expirationType}`);
+      
+      // First attempt with the specialized endpoint
       let updatedUrl;
       
-      if (expirationForm.expirationType === 'never') {
-        updatedUrl = await urlService.setUrlExpiration(selectedUrl.id, 'none', null);
-      } else if (expirationForm.expirationType === 'days') {
-        updatedUrl = await urlService.setUrlExpiration(
-          selectedUrl.id, 
-          'days', 
-          parseInt(expirationForm.expirationDays, 10)
-        );
-      } else if (expirationForm.expirationType === 'date') {
-        updatedUrl = await urlService.setUrlExpiration(
-          selectedUrl.id,
-          'date',
-          expirationForm.expirationDate
-        );
+      try {
+        if (expirationForm.expirationType === 'never') {
+          updatedUrl = await urlService.setUrlExpiration(selectedUrl.id, 'none', null);
+        } else if (expirationForm.expirationType === 'days') {
+          updatedUrl = await urlService.setUrlExpiration(
+            selectedUrl.id, 
+            'days', 
+            parseInt(expirationForm.expirationDays, 10)
+          );
+        } else if (expirationForm.expirationType === 'date') {
+          // Ensure we have a valid date to send
+          const dateValue = expirationForm.expirationDate;
+          if (!dateValue) {
+            throw new Error('Invalid date value');
+          }
+          
+          updatedUrl = await urlService.setUrlExpiration(
+            selectedUrl.id,
+            'date',
+            dateValue
+          );
+        }
+        
+        console.log('Initial response from update:', updatedUrl);
+      } catch (updateError) {
+        console.error('Error during expiration update:', updateError);
+        throw updateError;
       }
       
-      // Update URL in list
-      setUrls(prevUrls => 
-        prevUrls.map(item => 
-          item.id === selectedUrl.id ? updatedUrl : item
-        )
-      );
+      // Always fetch a fresh copy to make sure we have all fields
+      try {
+        console.log('Fetching fresh URL data after update');
+        const freshUrl = await urlService.getUrlById(selectedUrl.id);
+        console.log('Fresh URL data after update:', freshUrl);
+        
+        if (freshUrl && freshUrl.id) {
+          // Check if the expires_at field exists in the fresh data
+          if ((expirationForm.expirationType === 'never' && freshUrl.expires_at === null) ||
+              (expirationForm.expirationType !== 'never' && freshUrl.expires_at)) {
+            console.log('Fresh URL data contains correctly set expires_at field:', freshUrl.expires_at);
+          } else {
+            console.warn('Fresh URL data may have incorrect expires_at:', freshUrl.expires_at, 
+              'for expiration type:', expirationForm.expirationType);
+          }
+          
+          // Use the fresh data regardless
+          updatedUrl = freshUrl;
+        }
+      } catch (fetchError) {
+        console.error('Error fetching fresh URL data:', fetchError);
+        // Continue with whatever data we have from the update
+      }
+      
+      // Update URL in list with the final data
+      if (updatedUrl) {
+        // Enhanced logging for debugging
+        console.log(`Updating URL in state with expires_at:`, 
+          updatedUrl.expires_at !== undefined ? updatedUrl.expires_at : 'UNDEFINED',
+          'Full URL data:', updatedUrl
+        );
+        
+        // Always fetch the latest data one more time if expires_at is missing
+        if (expirationForm.expirationType !== 'never' && !updatedUrl.expires_at) {
+          try {
+            console.log('Making one final attempt to get latest URL data with expires_at field');
+            const finalAttempt = await urlService.getUrlById(selectedUrl.id);
+            console.log('Final data attempt:', finalAttempt);
+            
+            if (finalAttempt && finalAttempt.id) {
+              updatedUrl = finalAttempt;
+            }
+          } catch (finalError) {
+            console.error('Error in final data fetch attempt:', finalError);
+          }
+        }
+        
+        // Update state with the best data we have
+        setUrls(prevUrls => 
+          prevUrls.map(item => 
+            item.id === selectedUrl.id ? updatedUrl : item
+          )
+        );
+      }
       
       setShowExpirationModal(false);
       setSelectedUrl(null);
