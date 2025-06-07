@@ -11,6 +11,9 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import EmailVerificationPage from './pages/EmailVerificationPage';
+import ResendVerificationPage from './pages/ResendVerificationPage';
+import VerificationRequiredPage from './pages/VerificationRequiredPage';
 
 // Main pages
 import HomePage from './pages/HomePage';
@@ -37,6 +40,11 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password/:uidb64/:token" element={<ResetPasswordPage />} />
+            
+            {/* Email verification routes */}
+            <Route path="/verify-email/:token/:email" element={<EmailVerificationPage />} />
+            <Route path="/resend-verification" element={<ResendVerificationPage />} />
+            <Route path="/verification-required" element={<VerificationRequiredPage />} />
             
             {/* URL Redirection route */}
             <Route path="/s/:shortCode" element={<RedirectPage />} />

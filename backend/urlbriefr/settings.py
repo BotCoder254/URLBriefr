@@ -51,6 +51,9 @@ INSTALLED_APPS = [
     'analytics',
 ]
 
+# Add Anymail to installed apps
+INSTALLED_APPS += ['anymail']
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -67,7 +70,7 @@ ROOT_URLCONF = 'urlbriefr.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -169,3 +172,22 @@ CORS_ALLOWED_ORIGINS = [
 # URL Shortener settings
 URL_SHORTENER_DOMAIN = 'http://localhost:8000'
 DEFAULT_URL_LENGTH = 6
+
+# Email settings
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'telvivaztelvin@gmail.com')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'fqaw utzr mguk uchq ')
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+# Frontend URL for email verification links
+FRONTEND_URL = 'http://localhost:3000'
+EMAIL_VERIFICATION_TIMEOUT_DAYS = 7
+
+# Keep Anymail configuration for future reference
+ANYMAIL = {
+    "MAILGUN_API_KEY": os.environ.get('MAILGUN_API_KEY', '62143d0f14ee4b18fe2f4a7c6af6e2eb-08c79601-bb7b1a06'),
+    "MAILGUN_SENDER_DOMAIN": os.environ.get('MAILGUN_DOMAIN', 'urlbriefr.com'),
+}

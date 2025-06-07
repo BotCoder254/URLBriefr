@@ -55,10 +55,24 @@ const LoginForm = () => {
     setLoginError('');
     
     try {
-      await login(formData);
+      const result = await login(formData);
+      
+      // Check if email verification is required
+      if (result && result.requiresVerification) {
+        navigate('/verification-required');
+        return;
+      }
+      
       navigate('/dashboard');
     } catch (error) {
       console.error('Login error:', error);
+      
+      // Handle verification errors specifically
+      if (error.response?.data?.detail?.includes('verification')) {
+        navigate('/verification-required');
+        return;
+      }
+      
       setLoginError(
         error.response?.data?.detail || 
         'Failed to login. Please check your credentials.'
@@ -185,6 +199,18 @@ const LoginForm = () => {
             className="font-medium text-primary-600 hover:text-primary-500"
           >
             Sign up now
+          </Link>
+        </p>
+      </div>
+      
+      <div className="mt-4 text-center">
+        <p className="text-dark-500 text-sm">
+          Need to verify your email?{' '}
+          <Link 
+            to="/resend-verification" 
+            className="font-medium text-primary-600 hover:text-primary-500"
+          >
+            Resend verification email
           </Link>
         </p>
       </div>

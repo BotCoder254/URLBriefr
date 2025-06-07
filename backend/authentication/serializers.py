@@ -10,8 +10,8 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'role', 'date_joined', 'is_active']
-        read_only_fields = ['id', 'date_joined', 'is_active']
+        fields = ['id', 'email', 'first_name', 'last_name', 'role', 'date_joined', 'is_active', 'email_verified']
+        read_only_fields = ['id', 'date_joined', 'is_active', 'email_verified']
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -53,8 +53,14 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'role': user.role,
             'first_name': user.first_name,
             'last_name': user.last_name,
+            'email_verified': user.email_verified,
+            'is_active': user.is_active,
         })
         
+        # Check if email is verified
+        if not user.email_verified:
+            data['email_verification_required'] = True
+            
         return data
 
 
@@ -75,3 +81,34 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({"password": "Password fields didn't match."})
         return attrs 
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    """Serializer for changing password."""
+    
+    current_password = serializers.CharField(write_only=True, required=True)
+    new_password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    new_password2 = serializers.CharField(write_only=True, required=True)
+    
+    def validate(self, attrs):
+        if attrs['new_password'] != attrs['new_password2']:
+            raise serializers.ValidationError({"new_password": "Password fields didn't match."})
+        
+        # Verify current password
+        user = self.context['request'].user
+        if not user.check_password(attrs['current_password']):
+            raise serializers.ValidationError({"current_password": "Current password is incorrect."})
+            
+        return attrs
+
+
+class EmailVerificationSerializer(serializers.Serializer):
+    """Serializer for email verification."""
+    
+    token = serializers.UUIDField(required=True)
+
+
+class ResendVerificationEmailSerializer(serializers.Serializer):
+    """Serializer for resending verification email."""
+    
+    email = serializers.EmailField(required=True) 

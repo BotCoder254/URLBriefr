@@ -8,7 +8,13 @@ const ProtectedRoute = ({
   requiredRole = null, 
   redirectPath = '/login' 
 }) => {
-  const { isLoggedIn, userRole, loading } = useAuth();
+  const { 
+    isLoggedIn, 
+    userRole, 
+    loading, 
+    isEmailVerified,
+    requiresVerification 
+  } = useAuth();
   
   // If still loading, show a loading indicator
   if (loading) {
@@ -22,6 +28,11 @@ const ProtectedRoute = ({
   // Check if user is logged in
   if (!isLoggedIn) {
     return <Navigate to={redirectPath} replace />;
+  }
+  
+  // Check if email verification is required
+  if (requiresVerification || (isLoggedIn && !isEmailVerified)) {
+    return <Navigate to="/verification-required" replace />;
   }
   
   // Check if a specific role is required

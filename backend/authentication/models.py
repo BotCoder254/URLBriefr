@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.utils.translation import gettext_lazy as _
+import uuid
 
 class UserManager(BaseUserManager):
     """Define a model manager for User model with no username field."""
@@ -22,6 +23,8 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault('is_staff', False)
         extra_fields.setdefault('is_superuser', False)
         extra_fields.setdefault('role', User.Role.USER)
+        # Set new users to inactive until email verification
+        extra_fields.setdefault('is_active', False)
         return self._create_user(email, password, **extra_fields)
 
     def create_superuser(self, email, password, **extra_fields):
@@ -29,6 +32,8 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         extra_fields.setdefault('role', User.Role.ADMIN)
+        extra_fields.setdefault('is_active', True)
+        extra_fields.setdefault('email_verified', True)
 
         if extra_fields.get('is_staff') is not True:
             raise ValueError('Superuser must have is_staff=True.')
@@ -54,7 +59,12 @@ class User(AbstractUser):
         default=Role.USER,
     )
     date_joined = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=False)  # Changed default to False for email verification
+    
+    # Email verification fields
+    email_verified = models.BooleanField(default=False)
+    email_verification_token = models.UUIDField(default=uuid.uuid4, editable=False)
+    email_verification_sent_at = models.DateTimeField(null=True, blank=True)
 
     objects = UserManager()
 

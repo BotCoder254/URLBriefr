@@ -12,6 +12,14 @@ const authService = {
   login: async (credentials) => {
     const response = await api.post('/auth/login/', credentials);
     
+    // Check if email verification is required
+    if (response.data.email_verification_required) {
+      return {
+        ...response.data,
+        requiresVerification: true
+      };
+    }
+    
     // Store tokens and user info in localStorage
     if (response.data.access) {
       localStorage.setItem('access_token', response.data.access);
@@ -64,9 +72,31 @@ const authService = {
     return response.data;
   },
   
+  // Change password (for logged in users)
+  changePassword: async (passwordData) => {
+    const response = await api.post('/auth/password-change/', passwordData);
+    return response.data;
+  },
+  
+  // Delete user account
+  deleteAccount: async () => {
+    const response = await api.delete('/auth/account/delete/');
+    // Clear all local storage if successful
+    if (response.status === 204) {
+      authService.logout();
+    }
+    return response;
+  },
+  
+  // Get detailed user profile (including IP and other metadata)
+  getFullProfile: async () => {
+    const response = await api.get('/auth/me/');
+    return response.data;
+  },
+  
   // Update user profile
   updateProfile: async (userData) => {
-    const response = await api.put('/auth/me/', userData);
+    const response = await api.patch('/auth/me/', userData);
     
     // Update stored user data
     const currentUser = authService.getCurrentUser();
@@ -76,6 +106,24 @@ const authService = {
     }
     
     return response.data;
+  },
+  
+  // Verify email
+  verifyEmail: async (token, email) => {
+    const response = await api.post(`/auth/verify-email/${token}/${email}/`);
+    return response.data;
+  },
+  
+  // Resend verification email
+  resendVerificationEmail: async (email) => {
+    const response = await api.post('/auth/resend-verification-email/', { email });
+    return response.data;
+  },
+  
+  // Check if user email is verified
+  isEmailVerified: () => {
+    const user = authService.getCurrentUser();
+    return user ? user.email_verified : false;
   },
 };
 

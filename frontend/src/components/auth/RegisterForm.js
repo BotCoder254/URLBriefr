@@ -76,16 +76,31 @@ const RegisterForm = () => {
     
     try {
       // Register the user
-      await register(formData);
+      const registerResult = await register(formData);
       
-      // After registration, automatically log the user in
-      await login({
-        email: formData.email,
-        password: formData.password
-      });
+      // Check if verification is required
+      if (registerResult && registerResult.requiresVerification) {
+        // Redirect to verification required page
+        navigate('/verification-required');
+        return;
+      }
       
-      // Redirect to dashboard after successful registration and login
-      navigate('/dashboard');
+      // Attempt login (this is a fallback, as we should be redirected to verification required)
+      try {
+        await login({
+          email: formData.email,
+          password: formData.password
+        });
+        navigate('/dashboard');
+      } catch (loginError) {
+        // If login fails due to verification, redirect to verification page
+        if (loginError.response?.data?.detail?.includes('verification')) {
+          navigate('/verification-required');
+        } else {
+          // Otherwise redirect to login page
+          navigate('/login');
+        }
+      }
     } catch (error) {
       console.error('Registration error:', error);
       

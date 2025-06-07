@@ -9,6 +9,8 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [requiresVerification, setRequiresVerification] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
   
   // Initialize auth state on component mount
   useEffect(() => {
@@ -34,6 +36,15 @@ export const AuthProvider = ({ children }) => {
     
     try {
       const data = await authService.login(credentials);
+      
+      // Check if email verification is required
+      if (data.requiresVerification) {
+        setRequiresVerification(true);
+        setVerificationEmail(credentials.email);
+        setLoading(false);
+        return { requiresVerification: true, email: credentials.email };
+      }
+      
       const { access, refresh, ...user } = data;
       setCurrentUser(user);
       return user;
@@ -53,7 +64,10 @@ export const AuthProvider = ({ children }) => {
     
     try {
       const result = await authService.register(userData);
-      return result;
+      // After registration, set verification pending state
+      setRequiresVerification(true);
+      setVerificationEmail(userData.email);
+      return { ...result, requiresVerification: true, email: userData.email };
     } catch (err) {
       const message = 
         err.response?.data?.email?.[0] || 
@@ -70,6 +84,8 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     authService.logout();
     setCurrentUser(null);
+    setRequiresVerification(false);
+    setVerificationEmail('');
   };
   
   // Update profile function
@@ -90,6 +106,41 @@ export const AuthProvider = ({ children }) => {
     }
   };
   
+  // Verify email function
+  const verifyEmail = async (token, email) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await authService.verifyEmail(token, email);
+      setRequiresVerification(false);
+      return result;
+    } catch (err) {
+      const message = err.response?.data?.error || 'Email verification failed';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Resend verification email function
+  const resendVerificationEmail = async (email) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await authService.resendVerificationEmail(email || verificationEmail);
+      return result;
+    } catch (err) {
+      const message = err.response?.data?.error || 'Failed to resend verification email';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   // Context value
   const value = {
     currentUser,
@@ -101,6 +152,11 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateProfile,
+    requiresVerification,
+    verificationEmail,
+    verifyEmail,
+    resendVerificationEmail,
+    isEmailVerified: currentUser?.email_verified || false,
   };
   
   return (
