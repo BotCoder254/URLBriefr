@@ -237,6 +237,176 @@ const urlService = {
     }
   },
   
+  // Clone a URL with optional modifications
+  cloneUrl: async (id, modifications = {}) => {
+    try {
+      const response = await api.post(`/urls/${id}/clone/`, modifications);
+      return response.data;
+    } catch (error) {
+      console.error('Error cloning URL:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // IP Restriction management
+  
+  // Get all IP restrictions for the current user
+  getIpRestrictions: async () => {
+    try {
+      const response = await api.get('/ip-restrictions/');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting IP restrictions:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Create a new IP restriction
+  createIpRestriction: async (restrictionData) => {
+    try {
+      const response = await api.post('/ip-restrictions/', restrictionData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating IP restriction:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Update an IP restriction
+  updateIpRestriction: async (id, restrictionData) => {
+    try {
+      const response = await api.patch(`/ip-restrictions/${id}/`, restrictionData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating IP restriction:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Delete an IP restriction
+  deleteIpRestriction: async (id) => {
+    try {
+      const response = await api.delete(`/ip-restrictions/${id}/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting IP restriction:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Manage IP restrictions for a URL
+  addIpRestrictionToUrl: async (urlId, restrictionIds) => {
+    try {
+      // Get current URL data first
+      const urlData = await this.getUrlById(urlId);
+      
+      // Enable IP restrictions if not already enabled
+      const updatedData = {
+        enable_ip_restrictions: true,
+        ip_restriction_ids: restrictionIds
+      };
+      
+      const response = await api.patch(`/urls/${urlId}/`, updatedData);
+      return response.data;
+    } catch (error) {
+      console.error('Error adding IP restrictions to URL:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Security - Tamper-Proof Links
+  
+  // Enable tamper-proof protection for a URL
+  enableTamperProof: async (urlId) => {
+    try {
+      const response = await api.patch(`/urls/${urlId}/`, {
+        spoofing_protection: true
+      });
+      
+      // Generate the integrity hash if needed
+      if (!response.data.integrity_hash) {
+        await api.post(`/urls/${urlId}/regenerate_integrity_hash/`);
+        // Get fresh URL data with the hash
+        return await urlService.getUrlById(urlId);
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error enabling tamper-proof protection:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Disable tamper-proof protection for a URL
+  disableTamperProof: async (urlId) => {
+    try {
+      const response = await api.patch(`/urls/${urlId}/`, {
+        spoofing_protection: false
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error disabling tamper-proof protection:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Regenerate the integrity hash for a URL
+  regenerateIntegrityHash: async (urlId) => {
+    try {
+      const response = await api.post(`/urls/${urlId}/regenerate_integrity_hash/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error regenerating integrity hash:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Verify the integrity of a URL
+  verifyUrlIntegrity: async (urlId) => {
+    try {
+      const response = await api.get(`/urls/${urlId}/verify_integrity/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error verifying URL integrity:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Advanced URL filtering
+  
+  // Get all URLs with security features enabled
+  getSecureUrls: async () => {
+    try {
+      const response = await api.get('/urls/?has_security=true');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting secure URLs:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Get all cloned URLs
+  getClonedUrls: async () => {
+    try {
+      const response = await api.get('/urls/?cloned=true');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting cloned URLs:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Get all original (non-cloned) URLs
+  getOriginalUrls: async () => {
+    try {
+      const response = await api.get('/urls/?cloned=false');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting original URLs:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
   // Set URL expiration
   setUrlExpiration: async (id, expirationType, expirationValue) => {
     try {
@@ -536,7 +706,177 @@ const urlService = {
       // Don't throw error here to prevent breaking the user experience
       return null;
     }
-  }
+  },
+  
+  // Clone a URL with optional modifications
+  cloneUrl: async (id, modifications = {}) => {
+    try {
+      const response = await api.post(`/urls/${id}/clone/`, modifications);
+      return response.data;
+    } catch (error) {
+      console.error('Error cloning URL:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // IP Restriction management
+  
+  // Get all IP restrictions for the current user
+  getIpRestrictions: async () => {
+    try {
+      const response = await api.get('/ip-restrictions/');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting IP restrictions:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Create a new IP restriction
+  createIpRestriction: async (restrictionData) => {
+    try {
+      const response = await api.post('/ip-restrictions/', restrictionData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating IP restriction:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Update an IP restriction
+  updateIpRestriction: async (id, restrictionData) => {
+    try {
+      const response = await api.patch(`/ip-restrictions/${id}/`, restrictionData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating IP restriction:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Delete an IP restriction
+  deleteIpRestriction: async (id) => {
+    try {
+      const response = await api.delete(`/ip-restrictions/${id}/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting IP restriction:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Manage IP restrictions for a URL
+  addIpRestrictionToUrl: async (urlId, restrictionIds) => {
+    try {
+      // Get current URL data first
+      const urlData = await this.getUrlById(urlId);
+      
+      // Enable IP restrictions if not already enabled
+      const updatedData = {
+        enable_ip_restrictions: true,
+        ip_restriction_ids: restrictionIds
+      };
+      
+      const response = await api.patch(`/urls/${urlId}/`, updatedData);
+      return response.data;
+    } catch (error) {
+      console.error('Error adding IP restrictions to URL:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Security - Tamper-Proof Links
+  
+  // Enable tamper-proof protection for a URL
+  enableTamperProof: async (urlId) => {
+    try {
+      const response = await api.patch(`/urls/${urlId}/`, {
+        spoofing_protection: true
+      });
+      
+      // Generate the integrity hash if needed
+      if (!response.data.integrity_hash) {
+        await api.post(`/urls/${urlId}/regenerate_integrity_hash/`);
+        // Get fresh URL data with the hash
+        return await urlService.getUrlById(urlId);
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error enabling tamper-proof protection:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Disable tamper-proof protection for a URL
+  disableTamperProof: async (urlId) => {
+    try {
+      const response = await api.patch(`/urls/${urlId}/`, {
+        spoofing_protection: false
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error disabling tamper-proof protection:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Regenerate the integrity hash for a URL
+  regenerateIntegrityHash: async (urlId) => {
+    try {
+      const response = await api.post(`/urls/${urlId}/regenerate_integrity_hash/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error regenerating integrity hash:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Verify the integrity of a URL
+  verifyUrlIntegrity: async (urlId) => {
+    try {
+      const response = await api.get(`/urls/${urlId}/verify_integrity/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error verifying URL integrity:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Advanced URL filtering
+  
+  // Get all URLs with security features enabled
+  getSecureUrls: async () => {
+    try {
+      const response = await api.get('/urls/?has_security=true');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting secure URLs:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Get all cloned URLs
+  getClonedUrls: async () => {
+    try {
+      const response = await api.get('/urls/?cloned=true');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting cloned URLs:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Get all original (non-cloned) URLs
+  getOriginalUrls: async () => {
+    try {
+      const response = await api.get('/urls/?cloned=false');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting original URLs:', error.response?.data || error.message);
+      throw error;
+    }
+  },
 };
 
 export default urlService; 

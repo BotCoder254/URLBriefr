@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ShortenedURL, ABTestVariant, Tag
+from .models import ShortenedURL, ABTestVariant, Tag, IPRestriction, SpoofingAttempt
 from analytics.models import ClickEvent
 from django.conf import settings
 from django.utils import timezone
@@ -19,21 +19,44 @@ class TagSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'url_count']
     
     def get_url_count(self, obj):
-        """Get the number of URLs with this tag."""
+        """Get the number of URLs using this tag."""
         return obj.urls.count()
     
     def create(self, validated_data):
         """Create a new tag."""
         user = self.context['request'].user
         
-        # Check if tag with same name already exists for this user
-        if Tag.objects.filter(user=user, name=validated_data['name']).exists():
-            raise serializers.ValidationError({
-                'name': 'You already have a tag with this name.'
-            })
-        
-        validated_data['user'] = user
+        # If user is not included in data, use the requesting user
+        if user.is_authenticated and 'user' not in validated_data:
+            validated_data['user'] = user
+            
         return super().create(validated_data)
+
+class IPRestrictionSerializer(serializers.ModelSerializer):
+    """Serializer for IP restrictions."""
+    
+    class Meta:
+        model = IPRestriction
+        fields = ['id', 'restriction_type', 'ip_address', 'description', 'created_at']
+        read_only_fields = ['id', 'created_at']
+        
+    def create(self, validated_data):
+        """Create a new IP restriction."""
+        user = self.context['request'].user
+        
+        # If user is not included in data, use the requesting user
+        if user.is_authenticated and 'user' not in validated_data:
+            validated_data['user'] = user
+            
+        return super().create(validated_data)
+
+class SpoofingAttemptSerializer(serializers.ModelSerializer):
+    """Serializer for spoofing attempts."""
+    
+    class Meta:
+        model = SpoofingAttempt
+        fields = ['id', 'ip_address', 'user_agent', 'attempt_time', 'short_code', 'reason']
+        read_only_fields = ['id', 'attempt_time']
 
 class ABTestVariantSerializer(serializers.ModelSerializer):
     """Serializer for A/B test variants."""
@@ -43,9 +66,10 @@ class ABTestVariantSerializer(serializers.ModelSerializer):
     class Meta:
         model = ABTestVariant
         fields = [
-            'id', 'name', 'destination_url', 'weight', 
+            'id', 'shortened_url', 'destination_url', 'weight', 'name',
             'access_count', 'conversion_count', 'conversion_rate'
         ]
+        read_only_fields = ['id', 'access_count', 'conversion_count', 'conversion_rate']
     
     def get_conversion_rate(self, obj):
         """Calculate conversion rate."""
@@ -77,6 +101,17 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
     expiration_days = serializers.IntegerField(required=False)
     expiration_date = serializers.DateTimeField(required=False)
     
+    # New security feature fields
+    ip_restrictions = IPRestrictionSerializer(many=True, read_only=True)
+    ip_restriction_ids = serializers.PrimaryKeyRelatedField(
+        queryset=IPRestriction.objects.all(),
+        many=True,
+        write_only=True,
+        required=False
+    )
+    cloned_from_info = serializers.SerializerMethodField()
+    is_tampered = serializers.SerializerMethodField()
+    
     class Meta:
         model = ShortenedURL
         fields = [
@@ -87,12 +122,17 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             'variants', 'tags', 'tag_ids', 'folder',
             'use_redirect_page', 'redirect_page_type', 'redirect_delay',
             'custom_redirect_message', 'brand_name', 'brand_logo_url',
-            'expiration_type', 'expiration_days', 'expiration_date'
+            'expiration_type', 'expiration_days', 'expiration_date',
+            # New security fields
+            'enable_ip_restrictions', 'ip_restrictions', 'ip_restriction_ids',
+            'spoofing_protection', 'integrity_hash', 'is_tampered',
+            'cloned_from', 'cloned_from_info'
         ]
         read_only_fields = [
             'id', 'created_at', 'last_accessed',
             'access_count', 'full_short_url', 'is_expired',
-            'clicks_count', 'qr_code_url'
+            'clicks_count', 'qr_code_url', 'integrity_hash',
+            'is_tampered', 'cloned_from_info'
         ]
         extra_kwargs = {
             'user': {'required': False},
@@ -107,7 +147,10 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             'short_code': {'required': False},
             'title': {'required': False},
             'is_active': {'required': False},
-            'is_ab_test': {'required': False}
+            'is_ab_test': {'required': False},
+            'cloned_from': {'required': False},
+            'enable_ip_restrictions': {'required': False},
+            'spoofing_protection': {'required': False}
         }
     
     def get_full_short_url(self, obj):
@@ -125,6 +168,24 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
     def get_qr_code_url(self, obj):
         """Get the URL for the QR code."""
         return f"{settings.URL_SHORTENER_DOMAIN}/api/qr/{obj.short_code}"
+        
+    def get_is_tampered(self, obj):
+        """Check if URL integrity has been compromised."""
+        if not obj.spoofing_protection or not obj.integrity_hash:
+            return False
+        return not obj.verify_integrity()
+        
+    def get_cloned_from_info(self, obj):
+        """Get information about the original URL if this is a clone."""
+        if not obj.cloned_from:
+            return None
+            
+        return {
+            'id': obj.cloned_from.id,
+            'short_code': obj.cloned_from.short_code,
+            'title': obj.cloned_from.title,
+            'original_url': obj.cloned_from.original_url
+        }
     
     def to_representation(self, instance):
         """Custom representation to handle RelatedManager objects."""
@@ -156,8 +217,9 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
         if user.is_authenticated:
             validated_data['user'] = user
         
-        # Handle tag_ids separately
+        # Handle tag_ids and ip_restriction_ids separately
         tag_ids = validated_data.pop('tag_ids', None)
+        ip_restriction_ids = validated_data.pop('ip_restriction_ids', None)
         
         # Create the URL
         shortened_url = super().create(validated_data)
@@ -170,6 +232,13 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             else:
                 # Clear any existing tags
                 shortened_url.tags.clear()
+                
+        # Set IP restrictions if provided
+        if ip_restriction_ids is not None:
+            if len(ip_restriction_ids) > 0:
+                shortened_url.ip_restrictions.set(ip_restriction_ids)
+            else:
+                shortened_url.ip_restrictions.clear()
             
         return shortened_url
 
@@ -183,6 +252,21 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
         for tag in value:
             if tag.user != user:
                 raise serializers.ValidationError(f"Tag '{tag.name}' does not belong to you.")
+            
+        return value
+        
+    def validate_ip_restriction_ids(self, value):
+        """Validate that the user can only use their own IP restrictions."""
+        user = self.context['request'].user
+        
+        if not user.is_authenticated:
+            raise serializers.ValidationError("You must be logged in to use IP restrictions.")
+        
+        for restriction in value:
+            if restriction.user and restriction.user != user:
+                raise serializers.ValidationError(
+                    f"IP restriction '{restriction}' does not belong to you."
+                )
             
         return value
         
@@ -220,15 +304,31 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
                 instance.expires_at = None
                 print("Setting expiration date to None (never expires)")
         
+        # Handle tag_ids and ip_restriction_ids
+        tag_ids = validated_data.pop('tag_ids', None)
+        ip_restriction_ids = validated_data.pop('ip_restriction_ids', None)
+        
         # Remove extra fields that aren't in the model
         if 'expiration_days' in validated_data:
             validated_data.pop('expiration_days')
         if 'expiration_date' in validated_data:
             validated_data.pop('expiration_date')
             
+        # If spoofing protection is enabled, generate integrity hash
+        if 'spoofing_protection' in validated_data and validated_data['spoofing_protection'] and not instance.integrity_hash:
+            instance.generate_integrity_hash()
+            
         # Update the remaining fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        
+        # Set tags if provided
+        if tag_ids is not None:
+            instance.tags.set(tag_ids)
+            
+        # Set IP restrictions if provided
+        if ip_restriction_ids is not None:
+            instance.ip_restrictions.set(ip_restriction_ids)
             
         # Save the instance
         instance.save()
@@ -508,3 +608,78 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
                 shortened_url.tags.add(tag)
         
         return shortened_url 
+
+class CloneURLSerializer(serializers.Serializer):
+    """Serializer for cloning a URL."""
+    
+    # Fields that can be modified in the clone
+    original_url = serializers.URLField(required=False)
+    title = serializers.CharField(max_length=255, required=False)
+    is_active = serializers.BooleanField(required=False)
+    folder = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
+    
+    # Expiration settings
+    expiration_type = serializers.ChoiceField(
+        choices=['none', 'days', 'date'],
+        required=False
+    )
+    expiration_days = serializers.IntegerField(required=False)
+    expiration_date = serializers.DateTimeField(required=False)
+    
+    # Security settings
+    enable_ip_restrictions = serializers.BooleanField(required=False)
+    spoofing_protection = serializers.BooleanField(required=False)
+    
+    # Custom redirect settings
+    use_redirect_page = serializers.BooleanField(required=False)
+    redirect_page_type = serializers.ChoiceField(
+        choices=['default', 'rocket', 'working', 'digging'],
+        required=False
+    )
+    redirect_delay = serializers.IntegerField(required=False)
+    custom_redirect_message = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    brand_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    brand_logo_url = serializers.URLField(required=False, allow_blank=True, allow_null=True)
+    
+    # Tags
+    tag_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Tag.objects.all(),
+        many=True,
+        required=False
+    )
+    
+    def validate_tag_ids(self, value):
+        """Validate that the user can only use their own tags."""
+        user = self.context['request'].user
+        
+        if not user.is_authenticated:
+            raise serializers.ValidationError("You must be logged in to use tags.")
+        
+        for tag in value:
+            if tag.user != user:
+                raise serializers.ValidationError(f"Tag '{tag.name}' does not belong to you.")
+            
+        return value
+    
+    def validate(self, data):
+        """Validate that the expiration settings are correct."""
+        expiration_type = data.get('expiration_type')
+        
+        if expiration_type == 'days' and 'expiration_days' not in data:
+            raise serializers.ValidationError({
+                'expiration_days': 'This field is required when expiration_type is "days".'
+            })
+            
+        if expiration_type == 'date' and 'expiration_date' not in data:
+            raise serializers.ValidationError({
+                'expiration_date': 'This field is required when expiration_type is "date".'
+            })
+            
+        # Validate expiration date is in the future
+        if expiration_type == 'date' and 'expiration_date' in data:
+            if data['expiration_date'] <= timezone.now():
+                raise serializers.ValidationError({
+                    'expiration_date': 'Expiration date must be in the future.'
+                })
+                
+        return data 

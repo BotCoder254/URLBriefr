@@ -3,6 +3,8 @@ from django.conf import settings
 import string
 import random
 from django.utils import timezone
+import hashlib
+import ipaddress
 
 def generate_short_code(length=6):
     """Generate a random short code for URL."""
@@ -27,6 +29,43 @@ class Tag(models.Model):
     
     def __str__(self):
         return self.name
+
+
+class IPRestriction(models.Model):
+    """Model to store IP restrictions for URLs."""
+    TYPE_CHOICES = [
+        ('allow', 'Allow List'),
+        ('block', 'Block List'),
+    ]
+    
+    restriction_type = models.CharField(max_length=10, choices=TYPE_CHOICES, default='block')
+    ip_address = models.CharField(max_length=50)  # Can be single IP or CIDR notation
+    description = models.CharField(max_length=255, blank=True, null=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='ip_restrictions',
+        null=True,
+        blank=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.restriction_type}: {self.ip_address}"
+    
+    def is_ip_match(self, ip_to_check):
+        """Check if an IP address matches this restriction."""
+        try:
+            # Handle CIDR notation
+            if '/' in self.ip_address:
+                network = ipaddress.ip_network(self.ip_address, strict=False)
+                ip = ipaddress.ip_address(ip_to_check)
+                return ip in network
+            # Handle single IP
+            else:
+                return self.ip_address == ip_to_check
+        except ValueError:
+            return False
 
 
 class ShortenedURL(models.Model):
@@ -81,6 +120,22 @@ class ShortenedURL(models.Model):
     custom_redirect_message = models.CharField(max_length=255, blank=True, null=True)
     brand_name = models.CharField(max_length=100, blank=True, null=True)
     brand_logo_url = models.URLField(max_length=2000, blank=True, null=True)
+    
+    # Security features
+    integrity_hash = models.CharField(max_length=64, blank=True, null=True, help_text="SHA-256 hash to verify URL integrity")
+    enable_ip_restrictions = models.BooleanField(default=False, help_text="Enable IP-based access control")
+    ip_restrictions = models.ManyToManyField(IPRestriction, related_name='urls', blank=True)
+    spoofing_protection = models.BooleanField(default=False, help_text="Enable protection against link spoofing")
+    
+    # Cloning info
+    cloned_from = models.ForeignKey(
+        'self', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='clones',
+        help_text="The original URL this was cloned from"
+    )
 
     def __str__(self):
         return f"{self.short_code} -> {self.original_url[:50]}..."
@@ -89,6 +144,11 @@ class ShortenedURL(models.Model):
         # Generate a random short code if one is not provided
         if not self.short_code:
             self.short_code = self.generate_unique_code()
+            
+        # Generate integrity hash if it's enabled but not set
+        if self.spoofing_protection and not self.integrity_hash:
+            self.generate_integrity_hash()
+            
         super().save(*args, **kwargs)
         # Refresh from database to ensure we have the latest state
         if 'update_fields' not in kwargs:
@@ -140,6 +200,94 @@ class ShortenedURL(models.Model):
         self.access_count += 1
         self.last_accessed = timezone.now()
         self.save(update_fields=['access_count', 'last_accessed'])
+    
+    def generate_integrity_hash(self):
+        """Generate SHA-256 hash for tamper-proof verification."""
+        data = f"{self.original_url}|{self.short_code}|{settings.SECRET_KEY}"
+        self.integrity_hash = hashlib.sha256(data.encode()).hexdigest()
+        return self.integrity_hash
+    
+    def verify_integrity(self):
+        """Verify the URL hasn't been tampered with."""
+        if not self.integrity_hash:
+            return False
+        
+        expected_hash = self.generate_integrity_hash()
+        return self.integrity_hash == expected_hash
+    
+    def is_ip_allowed(self, ip_address):
+        """Check if an IP address is allowed to access this URL."""
+        if not self.enable_ip_restrictions:
+            return True
+            
+        # Get all restrictions for this URL
+        restrictions = self.ip_restrictions.all()
+        
+        # If no restrictions, allow access
+        if not restrictions.exists():
+            return True
+            
+        # Check allow list first
+        allow_list = restrictions.filter(restriction_type='allow')
+        if allow_list.exists():
+            # If there's an allow list, IP must be in it
+            for restriction in allow_list:
+                if restriction.is_ip_match(ip_address):
+                    return True
+            return False
+        
+        # Otherwise, check block list
+        block_list = restrictions.filter(restriction_type='block')
+        for restriction in block_list:
+            if restriction.is_ip_match(ip_address):
+                return False
+                
+        # If not in block list, allow access
+        return True
+    
+    def clone(self, user=None, modifications=None):
+        """Create a clone of this URL with optional modifications."""
+        if modifications is None:
+            modifications = {}
+            
+        # Create a new instance but don't save yet
+        clone = ShortenedURL(
+            original_url=modifications.get('original_url', self.original_url),
+            title=modifications.get('title', f"Clone of {self.title or self.short_code}"),
+            user=user or self.user,
+            cloned_from=self,
+            is_active=modifications.get('is_active', self.is_active),
+            is_custom_code=False,  # Always generate a new code for clones
+            use_redirect_page=modifications.get('use_redirect_page', self.use_redirect_page),
+            redirect_page_type=modifications.get('redirect_page_type', self.redirect_page_type),
+            redirect_delay=modifications.get('redirect_delay', self.redirect_delay),
+            custom_redirect_message=modifications.get('custom_redirect_message', self.custom_redirect_message),
+            brand_name=modifications.get('brand_name', self.brand_name),
+            brand_logo_url=modifications.get('brand_logo_url', self.brand_logo_url),
+            folder=modifications.get('folder', self.folder),
+            enable_ip_restrictions=modifications.get('enable_ip_restrictions', self.enable_ip_restrictions),
+            spoofing_protection=modifications.get('spoofing_protection', self.spoofing_protection),
+        )
+        
+        # Set expiration if provided
+        if 'expires_at' in modifications:
+            clone.expires_at = modifications['expires_at']
+        elif self.expires_at:
+            # If the original has an expiration, copy it
+            clone.expires_at = self.expires_at
+            
+        # Save the clone to generate a new short code
+        clone.save()
+        
+        # Copy tags if not specified in modifications
+        if 'tags' not in modifications and self.tags.exists():
+            clone.tags.set(self.tags.all())
+            
+        # Copy IP restrictions if enabled and not specified
+        if clone.enable_ip_restrictions and 'ip_restrictions' not in modifications and self.ip_restrictions.exists():
+            clone.ip_restrictions.set(self.ip_restrictions.all())
+            
+        return clone
         
     @classmethod
     def deactivate_expired_urls(cls):
@@ -190,3 +338,15 @@ class ABTestVariant(models.Model):
         """Increment conversion counter."""
         self.conversion_count += 1
         self.save(update_fields=['conversion_count'])
+
+
+class SpoofingAttempt(models.Model):
+    """Model to track link spoofing attempts."""
+    ip_address = models.CharField(max_length=50)
+    user_agent = models.TextField(blank=True, null=True)
+    attempt_time = models.DateTimeField(auto_now_add=True)
+    short_code = models.CharField(max_length=15)
+    reason = models.CharField(max_length=255)
+    
+    def __str__(self):
+        return f"{self.ip_address} - {self.short_code} - {self.attempt_time}"

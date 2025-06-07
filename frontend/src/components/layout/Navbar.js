@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMenu, FiX, FiUser, FiLogOut, FiLink, FiPieChart, FiGitBranch, FiTag } from 'react-icons/fi';
+import { FiMenu, FiX, FiUser, FiLogOut, FiLink, FiPieChart, FiGitBranch, FiTag, FiShield } from 'react-icons/fi';
 import useAuth from '../../hooks/useAuth';
 
 const Navbar = () => {
@@ -149,6 +149,14 @@ const Navbar = () => {
                           <FiTag className="mr-2" /> Organize
                         </Link>
                         
+                        <Link 
+                          to="/security" 
+                          className="flex items-center px-4 py-2 text-sm text-dark-700 hover:bg-gray-100"
+                          onClick={() => setIsProfileOpen(false)}
+                        >
+                          <FiShield className="mr-2" /> Security
+                        </Link>
+                        
                         <button 
                           className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
                           onClick={handleLogout}
@@ -283,6 +291,16 @@ const Navbar = () => {
                       onClick={() => setIsOpen(false)}
                     >
                       Organize
+                    </Link>
+                  </motion.div>
+                  
+                  <motion.div variants={itemVariants}>
+                    <Link 
+                      to="/security" 
+                      className="block px-3 py-2 rounded-md text-base font-medium text-dark-700 hover:text-primary-600 hover:bg-gray-50"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Security
                     </Link>
                   </motion.div>
                   

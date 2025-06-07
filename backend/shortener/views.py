@@ -3,8 +3,12 @@ from rest_framework import viewsets, permissions, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view, permission_classes
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import ShortenedURL, Tag, ABTestVariant
-from .serializers import ShortenedURLSerializer, CreateShortenedURLSerializer, TagSerializer, ABTestVariantSerializer
+from .models import ShortenedURL, Tag, ABTestVariant, IPRestriction, SpoofingAttempt
+from .serializers import (
+    ShortenedURLSerializer, CreateShortenedURLSerializer, TagSerializer, 
+    ABTestVariantSerializer, IPRestrictionSerializer, SpoofingAttemptSerializer,
+    CloneURLSerializer
+)
 from analytics.models import ClickEvent, UserSession
 from django.http import HttpResponseRedirect, HttpResponse
 from django.utils import timezone
@@ -23,6 +27,7 @@ from django.db.models import Count, Q
 # Constants for user limits
 MAX_FOLDERS_PER_USER = 5
 MAX_TAGS_PER_USER = 10
+MAX_IP_RESTRICTIONS_PER_USER = 20
 
 
 class TagViewSet(viewsets.ModelViewSet):
@@ -58,12 +63,44 @@ class TagViewSet(viewsets.ModelViewSet):
         return super().create(request, *args, **kwargs)
 
 
+class IPRestrictionViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing IP restrictions."""
+    serializer_class = IPRestrictionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        """Get IP restrictions for the current user."""
+        return IPRestriction.objects.filter(user=self.request.user)
+    
+    def create(self, request, *args, **kwargs):
+        """Create a new IP restriction with limit check."""
+        # Count user's existing IP restrictions
+        user = request.user
+        restriction_count = IPRestriction.objects.filter(user=user).count()
+        
+        # Check if user has reached the IP restriction limit
+        if restriction_count >= MAX_IP_RESTRICTIONS_PER_USER:
+            return Response(
+                {"error": f"You have reached the maximum limit of {MAX_IP_RESTRICTIONS_PER_USER} IP restrictions. Please delete some restrictions before creating new ones."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        return super().create(request, *args, **kwargs)
+
+
+class SpoofingAttemptViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for viewing spoofing attempts (read-only)."""
+    serializer_class = SpoofingAttemptSerializer
+    permission_classes = [permissions.IsAdminUser]
+    queryset = SpoofingAttempt.objects.all().order_by('-attempt_time')
+
+
 class ShortenedURLViewSet(viewsets.ModelViewSet):
     """ViewSet for shortened URLs."""
     
     serializer_class = ShortenedURLSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['is_active', 'is_ab_test', 'folder']
+    filterset_fields = ['is_active', 'is_ab_test', 'folder', 'enable_ip_restrictions', 'spoofing_protection']
     search_fields = ['short_code', 'original_url', 'title']
     ordering_fields = ['created_at', 'access_count', 'last_accessed']
     ordering = ['-created_at']
@@ -203,6 +240,81 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
             
         return Response(result_serializer.data)
     
+    @action(detail=True, methods=['post'])
+    def clone(self, request, pk=None):
+        """Clone a URL with optional modifications."""
+        instance = self.get_object()
+        
+        # Deserialize and validate the request data
+        serializer = CloneURLSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        
+        # Prepare modifications based on validated data
+        modifications = serializer.validated_data
+        
+        # Handle expiration settings
+        if 'expiration_type' in modifications:
+            expiration_type = modifications.pop('expiration_type')
+            
+            if expiration_type == 'days' and 'expiration_days' in modifications:
+                days = modifications.pop('expiration_days')
+                expiration_date = timezone.now() + timezone.timedelta(days=days)
+                modifications['expires_at'] = expiration_date
+            elif expiration_type == 'date' and 'expiration_date' in modifications:
+                modifications['expires_at'] = modifications.pop('expiration_date')
+            elif expiration_type == 'none':
+                modifications['expires_at'] = None
+                
+            # Remove any remaining expiration fields
+            modifications.pop('expiration_days', None)
+            modifications.pop('expiration_date', None)
+        
+        # Clone the URL
+        cloned_url = instance.clone(user=request.user, modifications=modifications)
+        
+        # Set tags if provided
+        if 'tag_ids' in serializer.validated_data:
+            cloned_url.tags.set(serializer.validated_data['tag_ids'])
+        
+        # Return the serialized cloned URL
+        response_serializer = ShortenedURLSerializer(cloned_url, context={'request': request})
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+    
+    @action(detail=True, methods=['post'])
+    def regenerate_integrity_hash(self, request, pk=None):
+        """Regenerate the integrity hash for tamper-proof verification."""
+        instance = self.get_object()
+        
+        # Enable spoofing protection if not already enabled
+        if not instance.spoofing_protection:
+            instance.spoofing_protection = True
+            
+        # Generate new hash
+        instance.generate_integrity_hash()
+        instance.save()
+        
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def verify_integrity(self, request, pk=None):
+        """Verify the URL integrity."""
+        instance = self.get_object()
+        
+        # If spoofing protection is not enabled, there's nothing to verify
+        if not instance.spoofing_protection or not instance.integrity_hash:
+            return Response({
+                'is_verified': False,
+                'reason': 'Tamper-proof protection is not enabled for this URL'
+            })
+            
+        is_verified = instance.verify_integrity()
+        
+        return Response({
+            'is_verified': is_verified,
+            'reason': 'Integrity verified' if is_verified else 'URL has been tampered with'
+        })
+        
     def get_queryset(self):
         """Get the queryset based on user role."""
         user = self.request.user
@@ -223,6 +335,20 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
             tag_ids = self.request.query_params.getlist('tag_id', None)
             if tag_ids:
                 queryset = queryset.filter(tags__id__in=tag_ids).distinct()
+                
+            # Filter by clone status
+            cloned = self.request.query_params.get('cloned', None)
+            if cloned == 'true':
+                queryset = queryset.filter(cloned_from__isnull=False)
+            elif cloned == 'false':
+                queryset = queryset.filter(cloned_from__isnull=True)
+                
+            # Filter by security features
+            has_security = self.request.query_params.get('has_security', None)
+            if has_security == 'true':
+                queryset = queryset.filter(
+                    Q(enable_ip_restrictions=True) | Q(spoofing_protection=True)
+                )
             
             search = self.request.query_params.get('search', None)
             if search:
@@ -250,6 +376,8 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
         """Use different serializers based on action."""
         if self.action == 'create':
             return CreateShortenedURLSerializer
+        if self.action == 'clone':
+            return CloneURLSerializer
         return ShortenedURLSerializer
     
     @action(detail=False, methods=['get'])
@@ -262,10 +390,20 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
         urls = ShortenedURL.objects.filter(user=user)
         total_clicks = sum(url.access_count for url in urls)
         
+        # Add security stats
+        security_enabled_count = urls.filter(
+            Q(enable_ip_restrictions=True) | Q(spoofing_protection=True)
+        ).count()
+        
+        # Add clone stats
+        cloned_count = urls.filter(cloned_from__isnull=False).count()
+        
         return Response({
             'total_urls': urls.count(),
             'total_clicks': total_clicks,
             'active_urls': urls.filter(is_active=True).count(),
+            'security_enabled': security_enabled_count,
+            'cloned_urls': cloned_count
         })
     
     @action(detail=False, methods=['get'])
@@ -363,8 +501,34 @@ def redirect_to_original(request, short_code):
             }
         }, status=status.HTTP_404_NOT_FOUND)
     
-    # Record analytics
+    # Get client IP for analytics and security checks
     client_ip, is_routable = ipware.ip.get_client_ip(request)
+    
+    # Check IP restrictions if enabled
+    if url.enable_ip_restrictions:
+        if not url.is_ip_allowed(client_ip):
+            # Log the blocked attempt
+            return Response({
+                'error': 'Access denied based on IP restrictions.',
+                'status': 'error',
+                'reason': 'ip_blocked'
+            }, status=status.HTTP_403_FORBIDDEN)
+    
+    # Verify tamper protection if enabled
+    if url.spoofing_protection and not url.verify_integrity():
+        # Log the spoofing attempt
+        SpoofingAttempt.objects.create(
+            ip_address=client_ip,
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            short_code=short_code,
+            reason="Integrity hash verification failed"
+        )
+        
+        return Response({
+            'error': 'This URL appears to have been tampered with.',
+            'status': 'error',
+            'reason': 'integrity_check_failed'
+        }, status=status.HTTP_400_BAD_REQUEST)
     
     # Parse user agent
     user_agent_string = request.META.get('HTTP_USER_AGENT', '')

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import { Toaster } from 'react-hot-toast';
 
 // Auth pages
 import LoginPage from './pages/LoginPage';
@@ -20,11 +21,13 @@ import NotFoundPage from './pages/NotFoundPage';
 import RedirectPage from './pages/RedirectPage';
 import ABTestingPage from './pages/ABTestingPage';
 import OrganizePage from './pages/OrganizePage';
+import SecuritySettingsPage from './pages/SecuritySettingsPage';
 
 function App() {
   return (
     <AuthProvider>
       <Router>
+        <Toaster position="top-right" />
         <Routes>
           {/* Authentication routes (no layout) */}
           <Route path="/login" element={<LoginPage />} />
@@ -107,6 +110,17 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <OrganizePage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/security"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <SecuritySettingsPage />
                 </Layout>
               </ProtectedRoute>
             }

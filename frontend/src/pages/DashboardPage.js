@@ -11,6 +11,7 @@ import TagBadge from '../components/url/TagBadge';
 import TagManagementModal from '../components/url/TagManagementModal';
 import FolderManagementModal from '../components/url/FolderManagementModal';
 import AdvancedOptionsForm from '../components/url/AdvancedOptionsForm';
+import { toast } from 'react-hot-toast';
 
 const DashboardPage = () => {
   const [urls, setUrls] = useState([]);
@@ -23,6 +24,7 @@ const DashboardPage = () => {
   const [showQRCodeModal, setShowQRCodeModal] = useState(false);
   const [showTagManagementModal, setShowTagManagementModal] = useState(false);
   const [showFolderManagementModal, setShowFolderManagementModal] = useState(false);
+  const [showCloneModal, setShowCloneModal] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [copied, setCopied] = useState(null);
@@ -71,6 +73,20 @@ const DashboardPage = () => {
   const [filterTags, setFilterTags] = useState([]);
   const [filterFolder, setFilterFolder] = useState('');
   const [activeFilters, setActiveFilters] = useState(false);
+  
+  // Clone URL form state
+  const [cloneData, setCloneData] = useState({
+    title: '',
+    original_url: '',
+    folder: '',
+    expiration_type: 'none',
+    expiration_days: 7,
+    expiration_date: '',
+    tag_ids: [],
+    enable_ip_restrictions: false,
+    spoofing_protection: false
+  });
+  const [cloneLoading, setCloneLoading] = useState(false);
   
   // Get tomorrow's date in YYYY-MM-DD format for min date in date picker
   const getTomorrowDate = () => {
@@ -692,6 +708,74 @@ const DashboardPage = () => {
     setShowQRCodeModal(true);
   };
   
+  const handleCloneClick = (url) => {
+    setSelectedUrl(url);
+    
+    // Pre-fill the clone form with data from the original URL
+    setCloneData({
+      title: `Clone of ${url.title || url.short_code}`,
+      original_url: url.original_url,
+      folder: url.folder || '',
+      expiration_type: url.expires_at ? 'date' : 'none',
+      expiration_days: 7,
+      expiration_date: url.expires_at ? formatDateForInput(url.expires_at) : getTomorrowDate(),
+      tag_ids: url.tags ? url.tags.map(tag => tag.id) : [],
+      enable_ip_restrictions: url.enable_ip_restrictions || false,
+      spoofing_protection: url.spoofing_protection || false
+    });
+    
+    setShowCloneModal(true);
+  };
+  
+  const handleCloneFormChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    
+    setCloneData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+  
+  const handleSubmitClone = async (e) => {
+    e.preventDefault();
+    
+    if (!selectedUrl) return;
+    
+    setCloneLoading(true);
+    
+    try {
+      // Convert tag_ids to integers if they're strings
+      const formattedData = {
+        ...cloneData,
+        tag_ids: cloneData.tag_ids.map(id => typeof id === 'string' ? parseInt(id, 10) : id)
+      };
+      
+      // Clone the URL
+      const clonedUrl = await urlService.cloneUrl(selectedUrl.id, formattedData);
+      
+      // Add the cloned URL to the list
+      setUrls(prevUrls => [clonedUrl, ...prevUrls]);
+      
+      // Close the modal
+      setShowCloneModal(false);
+      
+      // Show success message
+      toast.success('URL cloned successfully!');
+    } catch (error) {
+      console.error('Error cloning URL:', error);
+      toast.error(error.response?.data?.error || 'Failed to clone URL');
+    } finally {
+      setCloneLoading(false);
+    }
+  };
+  
+  // Helper function to format date for input fields
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  };
+  
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
@@ -1090,6 +1174,13 @@ const DashboardPage = () => {
                               title="Show QR Code"
                             >
                               <FiGrid />
+                            </button>
+                            <button
+                              onClick={() => handleCloneClick(url)}
+                              className="text-dark-400 hover:text-primary-600"
+                              title="Clone URL"
+                            >
+                              <FiCopy />
                             </button>
                           </div>
                         </td>
@@ -1732,6 +1823,200 @@ const DashboardPage = () => {
           fetchUrls(); // Refresh data after managing folders
         }}
       />
+      
+      {/* Clone URL Modal */}
+      {showCloneModal && selectedUrl && (
+        <div className="fixed inset-0 bg-dark-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-xl shadow-soft p-6 max-w-md w-full"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-display font-semibold text-dark-900">Clone URL</h2>
+              <button
+                onClick={() => setShowCloneModal(false)}
+                className="text-dark-400 hover:text-dark-600"
+              >
+                <FiX className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmitClone} className="space-y-4">
+              <div>
+                <label htmlFor="title" className="label">Title</label>
+                <input
+                  id="title"
+                  name="title"
+                  type="text"
+                  value={cloneData.title}
+                  onChange={handleCloneFormChange}
+                  className="input w-full"
+                  placeholder="Enter a title for the cloned URL"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="original_url" className="label">Original URL</label>
+                <input
+                  id="original_url"
+                  name="original_url"
+                  type="text"
+                  value={cloneData.original_url}
+                  onChange={handleCloneFormChange}
+                  className="input w-full"
+                  placeholder="Enter the original URL"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="folder" className="label">Folder</label>
+                <FolderSelector
+                  selectedFolder={cloneData.folder}
+                  onChange={(folder) => setCloneData(prev => ({ ...prev, folder }))}
+                />
+              </div>
+              
+              <div>
+                <label className="label">Expiration</label>
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="clone-expiration-none"
+                      name="expiration_type"
+                      value="none"
+                      checked={cloneData.expiration_type === 'none'}
+                      onChange={handleCloneFormChange}
+                      className="mr-2"
+                    />
+                    <label htmlFor="clone-expiration-none">No expiration</label>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="clone-expiration-days"
+                      name="expiration_type"
+                      value="days"
+                      checked={cloneData.expiration_type === 'days'}
+                      onChange={handleCloneFormChange}
+                      className="mr-2"
+                    />
+                    <label htmlFor="clone-expiration-days">Expires in days</label>
+                    {cloneData.expiration_type === 'days' && (
+                      <input
+                        type="number"
+                        name="expiration_days"
+                        value={cloneData.expiration_days}
+                        onChange={handleCloneFormChange}
+                        min="1"
+                        max="365"
+                        className="input ml-3 w-20"
+                      />
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="clone-expiration-date"
+                      name="expiration_type"
+                      value="date"
+                      checked={cloneData.expiration_type === 'date'}
+                      onChange={handleCloneFormChange}
+                      className="mr-2"
+                    />
+                    <label htmlFor="clone-expiration-date">Expires on date</label>
+                    {cloneData.expiration_type === 'date' && (
+                      <input
+                        type="date"
+                        name="expiration_date"
+                        value={cloneData.expiration_date}
+                        onChange={handleCloneFormChange}
+                        min={getTomorrowDate()}
+                        className="input ml-3"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Security Features */}
+              <div className="border-t border-gray-200 pt-4">
+                <h3 className="font-medium mb-3 text-dark-900">Security Features</h3>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="spoofing_protection"
+                      name="spoofing_protection"
+                      checked={cloneData.spoofing_protection}
+                      onChange={handleCloneFormChange}
+                      className="mr-2"
+                    />
+                    <label htmlFor="spoofing_protection" className="text-sm">
+                      <span className="font-medium">Tamper-Proof Links</span>
+                      <span className="block text-dark-500 text-xs">Verify link integrity using cryptographic hashes</span>
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="enable_ip_restrictions"
+                      name="enable_ip_restrictions"
+                      checked={cloneData.enable_ip_restrictions}
+                      onChange={handleCloneFormChange}
+                      className="mr-2"
+                    />
+                    <label htmlFor="enable_ip_restrictions" className="text-sm">
+                      <span className="font-medium">IP-Based Restrictions</span>
+                      <span className="block text-dark-500 text-xs">Block specific IP addresses from accessing your link</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <label htmlFor="tag_ids" className="label">Tags</label>
+                <TagSelector
+                  selectedTags={cloneData.tag_ids.map(id => ({ id }))}
+                  onChange={(tags) => setCloneData(prev => ({ ...prev, tag_ids: tags.map(tag => tag.id) }))}
+                />
+              </div>
+              
+              <div className="pt-4 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCloneModal(false)}
+                  className="btn btn-outline"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={cloneLoading}
+                  className="btn btn-primary"
+                >
+                  {cloneLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Cloning...
+                    </>
+                  ) : (
+                    'Clone URL'
+                  )}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
