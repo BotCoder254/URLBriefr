@@ -27,6 +27,8 @@ import ABTestingPage from './pages/ABTestingPage';
 import OrganizePage from './pages/OrganizePage';
 import SecuritySettingsPage from './pages/SecuritySettingsPage';
 import URLPreviewPage from './pages/URLPreviewPage';
+import AboutPage from './pages/AboutPage';
+import LearnMorePage from './pages/LearnMorePage';
 
 function App() {
   return (
@@ -58,6 +60,25 @@ function App() {
               element={
                 <Layout>
                   <HomePage />
+                </Layout>
+              }
+            />
+            
+            {/* About and Learn More pages */}
+            <Route
+              path="/about"
+              element={
+                <Layout>
+                  <AboutPage />
+                </Layout>
+              }
+            />
+            
+            <Route
+              path="/learn-more"
+              element={
+                <Layout>
+                  <LearnMorePage />
                 </Layout>
               }
             />

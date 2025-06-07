@@ -5,8 +5,10 @@ import { FiLink, FiCopy, FiArrowRight, FiCheckCircle, FiAlertCircle, FiSettings,
 import urlService from '../services/urlService';
 import QRCodeModal from '../components/url/QRCodeModal';
 import ABTestingForm from '../components/url/ABTestingForm';
+import useAuth from '../hooks/useAuth';
 
 const HomePage = () => {
+  const { isLoggedIn } = useAuth();
   const [originalUrl, setOriginalUrl] = useState('');
   const [shortenedUrl, setShortenedUrl] = useState('');
   const [shortenedUrlData, setShortenedUrlData] = useState(null);
@@ -547,14 +549,16 @@ const HomePage = () => {
                 variants={itemVariants}
                 className="mt-10 flex justify-center space-x-6"
               >
+                {!isLoggedIn && (
+                  <Link
+                    to="/register"
+                    className="btn btn-primary px-8 py-3"
+                  >
+                    Sign up for free
+                  </Link>
+                )}
                 <Link
-                  to="/register"
-                  className="btn btn-primary px-8 py-3"
-                >
-                  Sign up for free
-                </Link>
-                <Link
-                  to="/features"
+                  to="/learn-more"
                   className="btn btn-outline px-8 py-3"
                 >
                   Learn more
@@ -685,22 +689,35 @@ const HomePage = () => {
             <span className="block text-primary-300">Create your account today.</span>
           </h2>
           <div className="mt-8 flex lg:mt-0 lg:flex-shrink-0">
-            <div className="inline-flex rounded-md shadow">
-              <Link
-                to="/register"
-                className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-primary-600 bg-white hover:bg-primary-50"
-              >
-                Sign up for free
-              </Link>
-            </div>
-            <div className="ml-3 inline-flex rounded-md shadow">
-              <Link
-                to="/login"
-                className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-500"
-              >
-                Sign in
-              </Link>
-            </div>
+            {!isLoggedIn ? (
+              <>
+                <div className="inline-flex rounded-md shadow">
+                  <Link
+                    to="/register"
+                    className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-primary-600 bg-white hover:bg-primary-50"
+                  >
+                    Sign up for free
+                  </Link>
+                </div>
+                <div className="ml-3 inline-flex rounded-md shadow">
+                  <Link
+                    to="/login"
+                    className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-500"
+                  >
+                    Sign in
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <div className="inline-flex rounded-md shadow">
+                <Link
+                  to="/dashboard"
+                  className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-primary-600 bg-white hover:bg-primary-50"
+                >
+                  Go to Dashboard
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>
