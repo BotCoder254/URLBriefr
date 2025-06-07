@@ -163,11 +163,14 @@ SIMPLE_JWT = {
 }
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  # Only for development
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+# Import CORS settings from cors_settings.py
+from .cors_settings import *
+
+# Uncomment this in development if needed
+# CORS_ALLOW_ALL_ORIGINS = True
+
+# The rest of the CORS settings are imported from cors_settings.py
+# If you need to override any settings, do it here
 
 # URL Shortener settings
 URL_SHORTENER_DOMAIN = 'http://localhost:8000'
