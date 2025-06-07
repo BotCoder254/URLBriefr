@@ -51,11 +51,11 @@ const Footer = () => {
                   Documentation
                 </Link>
               </li>
-              <li>
+              {/* <li>
                 <Link to="/support" className="text-base text-dark-600 dark:text-dark-300 hover:text-primary-600">
                   Support
                 </Link>
-              </li>
+              </li> */}
               <li>
                 <Link to="/about" className="text-base text-dark-600 dark:text-dark-300 hover:text-primary-600">
                   About

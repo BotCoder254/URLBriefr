@@ -75,9 +75,9 @@ const Navbar = () => {
                 </>
               )}
               
-              <Link to="/pricing" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 dark:text-dark-200 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
+              {/* <Link to="/pricing" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 dark:text-dark-200 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
                 Pricing
-              </Link>
+              </Link> */}
               
               <Link to="/about" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 dark:text-dark-200 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
                 About
