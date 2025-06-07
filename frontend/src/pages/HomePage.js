@@ -550,12 +550,12 @@ const HomePage = () => {
                 className="mt-10 flex justify-center space-x-6"
               >
                 {!isLoggedIn && (
-                  <Link
-                    to="/register"
-                    className="btn btn-primary px-8 py-3"
-                  >
-                    Sign up for free
-                  </Link>
+                <Link
+                  to="/register"
+                  className="btn btn-primary px-8 py-3"
+                >
+                  Sign up for free
+                </Link>
                 )}
                 <Link
                   to="/learn-more"
@@ -691,22 +691,22 @@ const HomePage = () => {
           <div className="mt-8 flex lg:mt-0 lg:flex-shrink-0">
             {!isLoggedIn ? (
               <>
-                <div className="inline-flex rounded-md shadow">
-                  <Link
-                    to="/register"
-                    className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-primary-600 bg-white hover:bg-primary-50"
-                  >
-                    Sign up for free
-                  </Link>
-                </div>
-                <div className="ml-3 inline-flex rounded-md shadow">
-                  <Link
-                    to="/login"
-                    className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-500"
-                  >
-                    Sign in
-                  </Link>
-                </div>
+            <div className="inline-flex rounded-md shadow">
+              <Link
+                to="/register"
+                className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-primary-600 bg-white hover:bg-primary-50"
+              >
+                Sign up for free
+              </Link>
+            </div>
+            <div className="ml-3 inline-flex rounded-md shadow">
+              <Link
+                to="/login"
+                className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-500"
+              >
+                Sign in
+              </Link>
+            </div>
               </>
             ) : (
               <div className="inline-flex rounded-md shadow">
