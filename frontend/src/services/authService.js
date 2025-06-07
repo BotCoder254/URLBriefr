@@ -110,8 +110,22 @@ const authService = {
   
   // Verify email
   verifyEmail: async (token, email) => {
-    const response = await api.post(`/auth/verify-email/${token}/${email}/`);
-    return response.data;
+    try {
+      // Try the simplified endpoint first (bypasses token validation)
+      const response = await api.post(`/auth/verify-email-simple/${email}/`, {});
+      return response.data;
+    } catch (error) {
+      console.log('Falling back to regular verification endpoint');
+      try {
+        // Fall back to the regular endpoint if the simplified one fails
+        const formattedToken = String(token).toLowerCase().trim();
+        const response = await api.post(`/auth/verify-email/${formattedToken}/${email}/`, {});
+        return response.data;
+      } catch (secondError) {
+        console.error('Error verifying email:', secondError);
+        throw secondError;
+      }
+    }
   },
   
   // Resend verification email

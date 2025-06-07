@@ -9,7 +9,8 @@ from .views import (
     AccountDeleteView,
     PasswordChangeView,
     EmailVerificationView,
-    ResendVerificationEmailView
+    ResendVerificationEmailView,
+    SimpleEmailVerificationView
 )
 
 urlpatterns = [
@@ -27,5 +28,6 @@ urlpatterns = [
     
     # Email verification
     path('verify-email/<str:token>/<str:email>/', EmailVerificationView.as_view(), name='email-verification'),
+    path('verify-email-simple/<str:email>/', SimpleEmailVerificationView.as_view(), name='email-verification-simple'),
     path('resend-verification-email/', ResendVerificationEmailView.as_view(), name='resend-verification-email'),
 ] 

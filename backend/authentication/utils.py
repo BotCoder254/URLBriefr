@@ -22,8 +22,9 @@ def send_verification_email(user):
         user.email_verification_sent_at = timezone.now()
         user.save()
         
-        # Create verification URL
-        verification_url = f"{settings.FRONTEND_URL}/verify-email/{str(user.email_verification_token)}/{user.email}/"
+        # Create verification URL - ensure token is properly formatted
+        token = str(user.email_verification_token).lower().strip()
+        verification_url = f"{settings.FRONTEND_URL}/verify-email/{token}/{user.email}/"
         
         # Prepare email context
         context = {

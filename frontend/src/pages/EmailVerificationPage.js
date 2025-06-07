@@ -15,7 +15,10 @@ const EmailVerificationPage = () => {
   useEffect(() => {
     const verifyUserEmail = async () => {
       try {
-        await verifyEmail(token, email);
+        // Make sure token is properly formatted
+        const formattedToken = token ? String(token).toLowerCase().trim() : '';
+        console.log('Attempting to verify email with token:', formattedToken);
+        await verifyEmail(formattedToken, email);
         setVerificationStatus('success');
       } catch (error) {
         console.error('Verification error:', error);
@@ -29,6 +32,10 @@ const EmailVerificationPage = () => {
     
     if (token && email) {
       verifyUserEmail();
+    } else {
+      console.error('Missing token or email in URL parameters');
+      setVerificationStatus('error');
+      setErrorMessage('Invalid verification link. Please request a new one.');
     }
   }, [token, email, verifyEmail]);
   
