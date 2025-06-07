@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiArrowLeft, FiBarChart2, FiGlobe, FiClock, FiCalendar, FiCopy, FiCheckCircle, FiAlertCircle, FiToggleLeft, FiToggleRight, FiSmartphone, FiMonitor, FiTablet, FiUser, FiGitBranch } from 'react-icons/fi';
+import { FiArrowLeft, FiBarChart2, FiGlobe, FiClock, FiCalendar, FiCopy, FiCheckCircle, FiAlertCircle, FiToggleLeft, FiToggleRight, FiSmartphone, FiMonitor, FiTablet, FiUser, FiGitBranch, FiEye, FiExternalLink } from 'react-icons/fi';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import urlService from '../services/urlService';
 import ABTestingStats from '../components/url/ABTestingStats';
@@ -13,6 +13,7 @@ const URLAnalyticsPage = () => {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [statusToggling, setStatusToggling] = useState(false);
+  const [updatingPreview, setUpdatingPreview] = useState(false);
   
   useEffect(() => {
     const fetchAnalytics = async () => {
@@ -581,6 +582,125 @@ const URLAnalyticsPage = () => {
     );
   };
   
+  // Add PreviewSection component after the LocationSection component
+  const PreviewSection = ({ url, onUpdatePreview, isUpdating }) => {
+    if (!url) return null;
+    
+    const hasPreviewData = url.enable_preview && 
+      (url.preview_image || url.preview_title || url.preview_description);
+    
+    return (
+      <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-soft p-6 mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-display font-medium text-dark-900">
+            <FiEye className="inline mr-2" /> Destination Preview
+          </h3>
+          
+          <button
+            onClick={onUpdatePreview}
+            disabled={isUpdating}
+            className="btn btn-sm btn-outline"
+          >
+            {isUpdating ? 'Updating...' : 'Update Preview'}
+          </button>
+        </div>
+        
+        {url.enable_preview ? (
+          hasPreviewData ? (
+            <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
+              {url.preview_image && (
+                <div className="relative h-64 bg-gray-100">
+                  <img 
+                    src={url.preview_image} 
+                    alt={url.preview_title || "Preview"} 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+              
+              <div className="p-4">
+                {url.preview_title && (
+                  <h3 className="font-medium text-lg mb-2 text-dark-900">
+                    {url.preview_title}
+                  </h3>
+                )}
+                
+                {url.preview_description && (
+                  <p className="text-dark-600 text-sm mb-4">
+                    {url.preview_description}
+                  </p>
+                )}
+                
+                {url.preview_updated_at && (
+                  <div className="text-sm text-dark-500 flex items-center">
+                    <FiCalendar className="mr-1" />
+                    <span>Updated: {new Date(url.preview_updated_at).toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+              
+              <div className="p-3 bg-gray-50 border-t border-gray-200">
+                <a 
+                  href={url.original_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary-600 hover:underline flex items-center justify-center"
+                >
+                  Visit website <FiExternalLink className="ml-1" />
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-gray-50 rounded-lg p-8 text-center">
+              <FiEye className="mx-auto text-gray-400 text-4xl mb-3" />
+              <p className="text-dark-500">Preview is enabled but no preview data has been generated yet.</p>
+              <p className="text-sm text-dark-400 mt-2">
+                Click "Update Preview" to fetch content from the destination URL.
+              </p>
+            </div>
+          )
+        ) : (
+          <div className="bg-gray-50 rounded-lg p-8 text-center">
+            <FiEye className="mx-auto text-gray-400 text-4xl mb-3" />
+            <p className="text-dark-500">Preview is not enabled for this URL.</p>
+            <p className="text-sm text-dark-400 mt-2">
+              Enable preview in URL settings to show a preview of the destination content.
+            </p>
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+  
+  // Add handleUpdatePreview function
+  const handleUpdatePreview = async () => {
+    if (!analytics?.url) return;
+    
+    setUpdatingPreview(true);
+    
+    try {
+      const result = await urlService.updatePreview(id);
+      if (result && result.success) {
+        // Update analytics with the new preview data
+        setAnalytics({
+          ...analytics,
+          url: {
+            ...analytics.url,
+            enable_preview: true,
+            preview_title: result.preview.title,
+            preview_description: result.preview.description,
+            preview_image: result.preview.image,
+            preview_updated_at: result.preview.updated_at
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Error updating preview:', err);
+    } finally {
+      setUpdatingPreview(false);
+    }
+  };
+  
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
@@ -687,6 +807,13 @@ const URLAnalyticsPage = () => {
                   </div>
                 </div>
               </motion.div>
+              
+              {/* Preview Section - Add this new section */}
+              <PreviewSection 
+                url={analytics.url}
+                onUpdatePreview={handleUpdatePreview}
+                isUpdating={updatingPreview}
+              />
               
               {/* Stats Overview */}
               <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">

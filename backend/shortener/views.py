@@ -23,6 +23,8 @@ import random
 import uuid
 import hashlib
 from django.db.models import Count, Q
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
 
 # Constants for user limits
 MAX_FOLDERS_PER_USER = 5
@@ -282,37 +284,94 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def regenerate_integrity_hash(self, request, pk=None):
-        """Regenerate the integrity hash for tamper-proof verification."""
-        instance = self.get_object()
+        """Regenerate the integrity hash for a URL."""
+        url = self.get_object()
+        url.generate_integrity_hash()
+        url.save(update_fields=['integrity_hash'])
+        return Response({'integrity_hash': url.integrity_hash})
+    
+    @action(detail=True, methods=['post'])
+    def update_preview(self, request, pk=None):
+        """Fetch and update preview content for a destination URL."""
+        url = self.get_object()
         
-        # Enable spoofing protection if not already enabled
-        if not instance.spoofing_protection:
-            instance.spoofing_protection = True
+        try:
+            # Use requests to fetch the destination page
+            response = requests.get(url.original_url, timeout=10)
+            response.raise_for_status()
             
-        # Generate new hash
-        instance.generate_integrity_hash()
-        instance.save()
-        
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data)
+            # Use BeautifulSoup to parse the HTML
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Extract preview information
+            title = soup.title.string if soup.title else None
+            
+            # Try to get a meta description
+            description = None
+            meta_desc = soup.find('meta', attrs={'name': 'description'})
+            if meta_desc:
+                description = meta_desc.get('content', None)
+            
+            # Try to get an Open Graph image
+            preview_image = None
+            og_image = soup.find('meta', property='og:image')
+            if og_image:
+                preview_image = og_image.get('content', None)
+            
+            # If no OG image, try to find the first significant image
+            if not preview_image:
+                images = soup.find_all('img')
+                for img in images:
+                    # Skip tiny images, icons, etc.
+                    if img.get('width') and int(img.get('width')) > 200:
+                        src = img.get('src')
+                        if src:
+                            # Handle relative URLs
+                            if not src.startswith('http'):
+                                src = urljoin(url.original_url, src)
+                            preview_image = src
+                            break
+            
+            # Update the URL object with preview data
+            url.enable_preview = True
+            url.preview_title = title
+            url.preview_description = description
+            url.preview_image = preview_image
+            url.preview_updated_at = timezone.now()
+            url.save()
+            
+            return Response({
+                'success': True,
+                'preview': {
+                    'title': title,
+                    'description': description,
+                    'image': preview_image,
+                    'updated_at': url.preview_updated_at
+                }
+            })
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['get'])
     def verify_integrity(self, request, pk=None):
-        """Verify the URL integrity."""
-        instance = self.get_object()
+        """Verify the integrity of a URL."""
+        url = self.get_object()
         
-        # If spoofing protection is not enabled, there's nothing to verify
-        if not instance.spoofing_protection or not instance.integrity_hash:
+        if not url.integrity_hash:
             return Response({
-                'is_verified': False,
-                'reason': 'Tamper-proof protection is not enabled for this URL'
+                'valid': False,
+                'error': 'Integrity verification not enabled for this URL'
             })
             
-        is_verified = instance.verify_integrity()
+        is_valid = url.verify_integrity()
         
         return Response({
-            'is_verified': is_verified,
-            'reason': 'Integrity verified' if is_verified else 'URL has been tampered with'
+            'valid': is_valid,
+            'hash': url.integrity_hash
         })
         
     def get_queryset(self):
@@ -475,183 +534,159 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def redirect_to_original(request, short_code):
-    """Redirect to the original URL from a shortened URL."""
-    url = get_object_or_404(ShortenedURL, short_code=short_code)
-    
-    # Check if URL is active and not expired
-    if not url.is_active or url.is_expired():
-        error_reason = 'expired' if url.is_expired() else 'inactive'
-        expiry_date = url.expires_at.isoformat() if url.expires_at else None
+    """Redirect to the original URL associated with the short code."""
+    try:
+        # Find the URL object
+        url = get_object_or_404(ShortenedURL, short_code=short_code)
         
-        # Get the owner's email if available
-        owner_email = url.user.email if url.user else None
+        # Get client IP address for analytics and security checks
+        client_ip, is_routable = ipware.ip.get_client_ip(request)
+        user_agent_string = request.META.get('HTTP_USER_AGENT', '')
+        user_agent = parse(user_agent_string)
         
-        return Response({
-            'error': 'This URL has expired or is not active.',
-            'status': 'error',
-            'reason': error_reason,
-            'url_info': {
-                'short_code': url.short_code,
-                'title': url.title,
-                'created_at': url.created_at.isoformat(),
-                'expires_at': expiry_date,
-                'is_active': url.is_active,
-                'is_expired': url.is_expired(),
-                'owner': owner_email
-            }
-        }, status=status.HTTP_404_NOT_FOUND)
-    
-    # Get client IP for analytics and security checks
-    client_ip, is_routable = ipware.ip.get_client_ip(request)
-    
-    # Check IP restrictions if enabled
-    if url.enable_ip_restrictions:
-        if not url.is_ip_allowed(client_ip):
-            # Log the blocked attempt
+        # Generate a session ID for tracking
+        session_id = str(uuid.uuid4())
+        
+        # Check if URL is active
+        if not url.is_active:
+            # Return JSON response for inactive URLs
             return Response({
-                'error': 'Access denied based on IP restrictions.',
                 'status': 'error',
-                'reason': 'ip_blocked'
+                'reason': 'inactive',
+                'message': 'This URL has been deactivated by its creator.'
+            }, status=status.HTTP_404_NOT_FOUND)
+            
+        # Check if URL is expired
+        if url.is_expired():
+            # Return JSON response for expired URLs
+            return Response({
+                'status': 'error',
+                'reason': 'expired',
+                'message': 'This URL has expired and is no longer available.'
+            }, status=status.HTTP_404_NOT_FOUND)
+            
+        # Check IP restrictions if enabled
+        if url.enable_ip_restrictions and not url.is_ip_allowed(client_ip):
+            # Log the blocked attempt
+            print(f"IP blocked: {client_ip} attempted to access {short_code}")
+            # Return forbidden response
+            return Response({
+                'status': 'error',
+                'reason': 'ip_restricted',
+                'message': 'Access to this URL is restricted from your IP address.'
             }, status=status.HTTP_403_FORBIDDEN)
-    
-    # Verify tamper protection if enabled
-    if url.spoofing_protection and not url.verify_integrity():
-        # Log the spoofing attempt
-        SpoofingAttempt.objects.create(
+            
+        # Check for link spoofing if protection is enabled
+        if url.spoofing_protection:
+            if not url.verify_integrity():
+                # Log spoofing attempt
+                SpoofingAttempt.objects.create(
+                    ip_address=client_ip,
+                    user_agent=user_agent_string,
+                    short_code=short_code,
+                    reason="Integrity check failed"
+                )
+                return Response({
+                    'status': 'error',
+                    'reason': 'tampered',
+                    'message': 'This URL appears to have been tampered with and cannot be validated.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        # A/B testing logic
+        destination_url = url.original_url  # Default URL
+        is_ab_variant = False
+        variant_id = None
+        
+        if url.is_ab_test:
+            variants = url.variants.all()
+            if variants.exists():
+                # Get total weight
+                total_weight = sum([v.weight for v in variants])
+                
+                # Pick a random variant based on weights
+                if total_weight > 0:
+                    random_num = random.randint(1, total_weight)
+                    current_weight = 0
+                    
+                    for variant in variants:
+                        current_weight += variant.weight
+                        if random_num <= current_weight:
+                            destination_url = variant.destination_url
+                            variant.increment_counter()
+                            is_ab_variant = True
+                            variant_id = variant.id
+                            break
+        
+        # Create click event for analytics
+        event = ClickEvent.objects.create(
+            url=url,
             ip_address=client_ip,
-            user_agent=request.META.get('HTTP_USER_AGENT', ''),
-            short_code=short_code,
-            reason="Integrity hash verification failed"
+            user_agent=user_agent_string,
+            browser=user_agent.browser.family,
+            os=user_agent.os.family,
+            device=user_agent.device.family,
+            session_id=session_id
         )
         
-        return Response({
-            'error': 'This URL appears to have been tampered with.',
-            'status': 'error',
-            'reason': 'integrity_check_failed'
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Parse user agent
-    user_agent_string = request.META.get('HTTP_USER_AGENT', '')
-    user_agent = parse(user_agent_string)
-    
-    # Get geolocation data from IP
-    country = None
-    city = None
-    
-    try:
-        # Use a free IP geolocation API
-        geo_response = requests.get(f'https://ipapi.co/{client_ip}/json/')
-        if geo_response.status_code == 200:
-            geo_data = geo_response.json()
-            country = geo_data.get('country_name')
-            city = geo_data.get('city')
-    except Exception as e:
-        # If geolocation fails, just continue without location data
-        print(f"Geolocation error: {e}")
-    
-    # Session tracking for retention and funnel metrics
-    # First, try to get session ID from cookies
-    session_id = request.COOKIES.get('urlbriefr_session')
-    
-    # If no session ID in cookie, create a new one
-    if not session_id:
-        session_id = str(uuid.uuid4())
-    
-    # Create a unique visitor ID based on IP and User-Agent (hashed for privacy)
-    visitor_hash_source = f"{client_ip}|{user_agent_string}"
-    visitor_id = hashlib.md5(visitor_hash_source.encode()).hexdigest()
-    
-    # Find or create a session
-    session, created = UserSession.objects.get_or_create(
-        url=url,
-        session_id=session_id,
-        defaults={
-            'visitor_id': visitor_id,
-            'ip_address': client_ip,
-            'user_agent': user_agent_string,
-            'browser': f"{user_agent.browser.family} {user_agent.browser.version_string}",
-            'device': user_agent.device.family,
-            'os': f"{user_agent.os.family} {user_agent.os.version_string}",
-        }
-    )
-    
-    # If session exists, update it to track retention
-    if not created:
-        session.update_visit()
-    
-    # Create click event with session info
-    click_event = ClickEvent.objects.create(
-        url=url,
-        ip_address=client_ip,
-        user_agent=user_agent_string,
-        browser=f"{user_agent.browser.family} {user_agent.browser.version_string}",
-        device=user_agent.device.family,
-        os=f"{user_agent.os.family} {user_agent.os.version_string}",
-        referrer=request.META.get('HTTP_REFERER', ''),
-        country=country,
-        city=city,
-        session_id=session_id
-    )
-    
-    # Increment counter for the main URL
-    url.increment_counter()
-    
-    # Handle A/B testing if enabled
-    destination_url = url.original_url
-    if url.is_ab_test:
-        # Get all variants
-        variants = url.variants.all()
+        # Create user session record
+        UserSession.objects.create(
+            session_id=session_id,
+            url=url,
+            ip_address=client_ip,
+            user_agent=user_agent_string
+        )
         
-        if variants:
-            # Select a variant based on weight
-            weights = [variant.weight for variant in variants]
+        # Increment URL access counter
+        url.increment_counter()
+        
+        # Handle one-time use links - make the link inactive after this use
+        if url.one_time_use:
+            url.is_active = False
+            url.save(update_fields=['is_active'])
+        
+        # Check if custom redirect page is enabled
+        if url.use_redirect_page:
+            # Prepare preview data if enabled
+            preview_data = None
+            if url.enable_preview and (url.preview_image or url.preview_title or url.preview_description):
+                preview_data = {
+                    'title': url.preview_title,
+                    'description': url.preview_description,
+                    'image': url.preview_image,
+                    'updated_at': url.preview_updated_at
+                }
             
-            # Select a variant based on weights
-            selected_variant = random.choices(variants, weights=weights, k=1)[0]
+            # Return JSON with redirect info for custom page handling in frontend
+            return Response({
+                'status': 'success',
+                'redirect_type': 'custom',
+                'destination_url': destination_url,
+                'redirect_settings': {
+                    'page_type': url.redirect_page_type,
+                    'delay': url.redirect_delay,
+                    'message': url.custom_redirect_message,
+                    'title': url.title,
+                    'brand_name': url.brand_name,
+                    'brand_logo_url': url.brand_logo_url,
+                    'session_id': session_id,
+                    'short_code': short_code,
+                    'full_short_url': request.build_absolute_uri(),
+                    'enable_preview': url.enable_preview,
+                    'preview_data': preview_data,
+                    'one_time_use': url.one_time_use
+                }
+            })
             
-            # Update the destination URL
-            destination_url = selected_variant.destination_url
-            
-            # Increment counter for the selected variant
-            selected_variant.increment_counter()
-    
-    # Base response - will add cookies later
-    response = None
-    
-    # Check if custom redirect page is enabled
-    if url.use_redirect_page:
-        # Return data for the frontend to handle the custom redirect page
-        response = Response({
-            'status': 'success',
-            'redirect_type': 'custom',
-            'destination_url': destination_url,
-            'redirect_settings': {
-                'page_type': url.redirect_page_type,
-                'delay': url.redirect_delay,
-                'message': url.custom_redirect_message or f"Redirecting to your destination...",
-                'brand_name': url.brand_name,
-                'brand_logo_url': url.brand_logo_url,
-                'title': url.title,
-                'short_code': url.short_code,
-                'full_short_url': f"{settings.URL_SHORTENER_DOMAIN}/s/{url.short_code}",
-                'session_id': session_id  # Include session ID for tracking completion
-            }
-        })
-    else:
-        # Direct redirect without custom page
-        response = HttpResponseRedirect(destination_url)
-    
-    # Set session cookie for funnel tracking
-    response.set_cookie(
-        'urlbriefr_session', 
-        session_id, 
-        max_age=60*60*24*30,  # 30 days
-        secure=settings.SESSION_COOKIE_SECURE,
-        httponly=True,
-        samesite='Lax'
-    )
-    
-    return response
+        # For direct redirects, just redirect to the destination URL
+        return HttpResponseRedirect(destination_url)
+        
+    except Exception as e:
+        print(f"Error in redirect: {str(e)}")
+        return Response({
+            'status': 'error',
+            'reason': 'general_error',
+            'message': 'An error occurred while processing your request.'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])

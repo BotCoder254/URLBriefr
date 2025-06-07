@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FiChevronDown, FiChevronUp, FiCalendar, FiClock, FiCheck, FiX, FiExternalLink } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiCalendar, FiClock, FiCheck, FiX, FiExternalLink, FiEye, FiLink, FiAlertCircle } from 'react-icons/fi';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
 const AdvancedOptionsForm = ({ formData, setFormData }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isRedirectExpanded, setIsRedirectExpanded] = useState(false);
+  const [isSecurityExpanded, setIsSecurityExpanded] = useState(false);
   
   const handleExpirationTypeChange = (type) => {
     const updatedData = {
@@ -31,6 +32,20 @@ const AdvancedOptionsForm = ({ formData, setFormData }) => {
     setFormData({
       ...formData,
       redirect_page_type: type
+    });
+  };
+  
+  const handleOneTimeUseToggle = () => {
+    setFormData({
+      ...formData,
+      one_time_use: !formData.one_time_use
+    });
+  };
+  
+  const handlePreviewToggle = () => {
+    setFormData({
+      ...formData,
+      enable_preview: !formData.enable_preview
     });
   };
   
@@ -93,7 +108,27 @@ const AdvancedOptionsForm = ({ formData, setFormData }) => {
                 {formData.expiration_type === 'date' && <FiCheck className="mr-1" />}
                 <FiCalendar className="mr-1" /> Specific date
               </button>
+              
+              <button
+                type="button"
+                className={`px-4 py-2 rounded-md border flex items-center ${
+                  formData.one_time_use
+                    ? 'border-primary-600 bg-primary-50 text-primary-700'
+                    : 'border-gray-300 text-dark-500 hover:bg-gray-50'
+                }`}
+                onClick={handleOneTimeUseToggle}
+              >
+                {formData.one_time_use && <FiCheck className="mr-1" />}
+                <FiLink className="mr-1" /> One-time use
+              </button>
             </div>
+            
+            {formData.one_time_use && (
+              <div className="text-sm text-dark-500 p-2 bg-amber-50 border border-amber-200 rounded-md flex items-start">
+                <FiAlertCircle className="text-amber-500 mt-0.5 mr-2 flex-shrink-0" />
+                <span>This link will expire immediately after the first click</span>
+              </div>
+            )}
             
             {formData.expiration_type === 'days' && (
               <div className="flex items-center">
@@ -122,6 +157,32 @@ const AdvancedOptionsForm = ({ formData, setFormData }) => {
                   minDate={new Date()}
                   className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500"
                 />
+              </div>
+            )}
+          </div>
+          
+          {/* Live Preview settings */}
+          <div className="space-y-3 pt-4 border-t border-gray-200">
+            <h4 className="text-md font-medium text-dark-800">Destination Preview</h4>
+            <div className="flex items-center mb-2">
+              <button
+                type="button"
+                className={`px-4 py-2 rounded-md border flex items-center ${
+                  formData.enable_preview
+                    ? 'border-primary-600 bg-primary-50 text-primary-700'
+                    : 'border-gray-300 text-dark-500 hover:bg-gray-50'
+                }`}
+                onClick={handlePreviewToggle}
+              >
+                {formData.enable_preview && <FiCheck className="mr-1" />}
+                <FiEye className="mr-1" /> Enable Live Preview
+              </button>
+            </div>
+            
+            {formData.enable_preview && (
+              <div className="text-sm text-dark-500 p-2 bg-blue-50 border border-blue-200 rounded-md flex items-start">
+                <FiAlertCircle className="text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
+                <span>A preview of the destination page will be generated and shown to users before they click through.</span>
               </div>
             )}
           </div>
@@ -248,9 +309,9 @@ const AdvancedOptionsForm = ({ formData, setFormData }) => {
                   <input
                     type="text"
                     id="custom_redirect_message"
-                    placeholder="Redirecting to your destination..."
                     value={formData.custom_redirect_message || ''}
                     onChange={(e) => setFormData({ ...formData, custom_redirect_message: e.target.value })}
+                    placeholder="You're about to be redirected..."
                     className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500"
                   />
                 </div>
@@ -262,9 +323,9 @@ const AdvancedOptionsForm = ({ formData, setFormData }) => {
                   <input
                     type="text"
                     id="brand_name"
-                    placeholder="Your Company Name"
                     value={formData.brand_name || ''}
                     onChange={(e) => setFormData({ ...formData, brand_name: e.target.value })}
+                    placeholder="Your Company Name"
                     className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500"
                   />
                 </div>
@@ -274,11 +335,11 @@ const AdvancedOptionsForm = ({ formData, setFormData }) => {
                     Brand Logo URL (optional)
                   </label>
                   <input
-                    type="url"
+                    type="text"
                     id="brand_logo_url"
-                    placeholder="https://example.com/logo.png"
                     value={formData.brand_logo_url || ''}
                     onChange={(e) => setFormData({ ...formData, brand_logo_url: e.target.value })}
+                    placeholder="https://example.com/logo.png"
                     className="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500"
                   />
                 </div>

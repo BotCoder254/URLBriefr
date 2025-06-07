@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FiArrowRight, FiExternalLink, FiLink, FiCopy, FiCheckCircle } from 'react-icons/fi';
+import { FiArrowRight, FiExternalLink, FiLink, FiCopy, FiCheckCircle, FiEye, FiAlertCircle } from 'react-icons/fi';
 import RocketAnimation from './animations/RocketAnimation';
 import WorkingAnimation from './animations/WorkingAnimation';
 import DiggingAnimation from './animations/DiggingAnimation';
@@ -65,6 +65,12 @@ const CustomRedirectPage = ({ destinationUrl, settings }) => {
   
   // Render the appropriate animation based on page type
   const renderAnimation = () => {
+    // If preview is enabled and we have preview data, don't show animation
+    if (settings.enable_preview && settings.preview_data) {
+      return renderPreview();
+    }
+    
+    // Otherwise show the animation
     switch (settings.page_type) {
       case 'rocket':
         return <RocketAnimation />;
@@ -79,6 +85,52 @@ const CustomRedirectPage = ({ destinationUrl, settings }) => {
           </div>
         );
     }
+  };
+  
+  // Render preview content
+  const renderPreview = () => {
+    const { preview_data } = settings;
+    if (!preview_data) return null;
+    
+    return (
+      <div className="mb-4">
+        <div className="relative rounded-lg overflow-hidden shadow-md">
+          {/* Preview image */}
+          {preview_data.image && (
+            <div className="relative">
+              <img 
+                src={preview_data.image} 
+                alt={preview_data.title || "Preview"} 
+                className="w-full h-48 object-cover"
+              />
+              <div className="absolute top-2 right-2 bg-primary-600 text-white px-2 py-1 rounded-md text-xs font-medium flex items-center">
+                <FiEye className="mr-1" /> Preview
+              </div>
+            </div>
+          )}
+          
+          {/* Preview content */}
+          <div className="p-4 bg-white">
+            {preview_data.title && (
+              <h3 className="font-medium text-lg mb-2 text-dark-900">
+                {preview_data.title}
+              </h3>
+            )}
+            
+            {preview_data.description && (
+              <p className="text-dark-600 text-sm mb-3">
+                {preview_data.description}
+              </p>
+            )}
+            
+            <div className="text-sm text-dark-500 flex items-center">
+              <FiExternalLink className="mr-1" />
+              <span>{formatUrl(destinationUrl)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
   
   return (
@@ -119,7 +171,7 @@ const CustomRedirectPage = ({ destinationUrl, settings }) => {
             </p>
           </div>
           
-          {/* Animation */}
+          {/* Animation or Preview */}
           {renderAnimation()}
           
           {/* Destination info */}
@@ -159,6 +211,14 @@ const CustomRedirectPage = ({ destinationUrl, settings }) => {
               </div>
             </div>
           </div>
+          
+          {/* One-time use warning if applicable */}
+          {settings.one_time_use && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800 flex items-center">
+              <FiAlertCircle className="text-amber-500 mr-2 flex-shrink-0" />
+              <span>This is a one-time use link and will expire after you visit it.</span>
+            </div>
+          )}
           
           {/* Progress and redirect button */}
           <div className="space-y-4">

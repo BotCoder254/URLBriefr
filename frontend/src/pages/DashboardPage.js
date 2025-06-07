@@ -32,6 +32,7 @@ const DashboardPage = () => {
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'active', 'inactive'
   const [sortBy, setSortBy] = useState('created_at'); // 'created_at', 'access_count', 'short_code'
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc', 'desc'
+  const [updatingPreview, setUpdatingPreview] = useState(false);
   
   // New URL form state
   const [newUrl, setNewUrl] = useState({
@@ -144,7 +145,7 @@ const DashboardPage = () => {
   
   const handleCreateUrl = async (e) => {
     if (e && e.preventDefault) {
-      e.preventDefault();
+    e.preventDefault();
     }
     
     // Validate form
@@ -193,7 +194,7 @@ const DashboardPage = () => {
       if (urlData.expiration_type) {
         // If expiration type is days, ensure we have a number
         if (urlData.expiration_type === 'days' && urlData.expiration_days) {
-          urlData.expiration_days = parseInt(urlData.expiration_days, 10);
+        urlData.expiration_days = parseInt(urlData.expiration_days, 10);
         } else if (urlData.expiration_type === 'none') {
           // If no expiration, remove any expiration dates
           delete urlData.expiration_days;
@@ -410,7 +411,7 @@ const DashboardPage = () => {
     
     try {
       // Parse date
-      const date = new Date(dateString);
+    const date = new Date(dateString);
       
       // Check for invalid date
       if (isNaN(date.getTime())) {
@@ -605,24 +606,24 @@ const DashboardPage = () => {
       let updatedUrl;
       
       try {
-        if (expirationForm.expirationType === 'never') {
-          updatedUrl = await urlService.setUrlExpiration(selectedUrl.id, 'none', null);
-        } else if (expirationForm.expirationType === 'days') {
-          updatedUrl = await urlService.setUrlExpiration(
-            selectedUrl.id, 
-            'days', 
-            parseInt(expirationForm.expirationDays, 10)
-          );
-        } else if (expirationForm.expirationType === 'date') {
+      if (expirationForm.expirationType === 'never') {
+        updatedUrl = await urlService.setUrlExpiration(selectedUrl.id, 'none', null);
+      } else if (expirationForm.expirationType === 'days') {
+        updatedUrl = await urlService.setUrlExpiration(
+          selectedUrl.id, 
+          'days', 
+          parseInt(expirationForm.expirationDays, 10)
+        );
+      } else if (expirationForm.expirationType === 'date') {
           // Ensure we have a valid date to send
           const dateValue = expirationForm.expirationDate;
           if (!dateValue) {
             throw new Error('Invalid date value');
           }
           
-          updatedUrl = await urlService.setUrlExpiration(
-            selectedUrl.id,
-            'date',
+        updatedUrl = await urlService.setUrlExpiration(
+          selectedUrl.id,
+          'date',
             dateValue
           );
         }
@@ -681,11 +682,11 @@ const DashboardPage = () => {
         }
         
         // Update state with the best data we have
-        setUrls(prevUrls => 
-          prevUrls.map(item => 
-            item.id === selectedUrl.id ? updatedUrl : item
-          )
-        );
+      setUrls(prevUrls => 
+        prevUrls.map(item => 
+          item.id === selectedUrl.id ? updatedUrl : item
+        )
+      );
       }
       
       setShowExpirationModal(false);
@@ -774,6 +775,40 @@ const DashboardPage = () => {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toISOString().split('T')[0];
+  };
+  
+  // Add a function to update the URL preview
+  const handleUpdatePreview = async (url) => {
+    if (!url || !url.id) return;
+    
+    setUpdatingPreview(true);
+    
+    try {
+      const result = await urlService.updatePreview(url.id);
+      if (result && result.success) {
+        // Update the selected URL with the new preview data
+        const updatedUrl = {
+          ...url,
+          enable_preview: true,
+          preview_title: result.preview.title,
+          preview_description: result.preview.description,
+          preview_image: result.preview.image,
+          preview_updated_at: result.preview.updated_at
+        };
+        
+        setSelectedUrl(updatedUrl);
+        
+        // Also update the URL in the list
+        setUrls(prevUrls => prevUrls.map(u => u.id === url.id ? updatedUrl : u));
+        
+        toast.success('Preview updated successfully');
+      }
+    } catch (err) {
+      console.error('Error updating preview:', err);
+      toast.error('Failed to update preview');
+    } finally {
+      setUpdatingPreview(false);
+    }
   };
   
   if (loading) {
@@ -1616,6 +1651,62 @@ const DashboardPage = () => {
               <div>
                 <p className="text-sm text-dark-500 mb-1">Total Clicks</p>
                 <p className="text-2xl font-display font-bold text-primary-600">{selectedUrl.access_count}</p>
+              </div>
+              
+              {/* Preview section */}
+              <div className="border-t border-gray-200 pt-4">
+                <div className="flex justify-between items-center mb-2">
+                  <p className="text-sm text-dark-500">URL Preview</p>
+                  <button
+                    onClick={() => handleUpdatePreview(selectedUrl)}
+                    disabled={updatingPreview}
+                    className="btn btn-sm btn-outline flex items-center"
+                  >
+                    <FiEye className="mr-1" />
+                    {updatingPreview ? 'Updating...' : 'Update Preview'}
+                  </button>
+                </div>
+                
+                {selectedUrl.enable_preview && (selectedUrl.preview_image || selectedUrl.preview_title || selectedUrl.preview_description) ? (
+                  <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
+                    {selectedUrl.preview_image && (
+                      <img
+                        src={selectedUrl.preview_image}
+                        alt={selectedUrl.preview_title || "Preview"}
+                        className="w-full h-32 object-cover"
+                      />
+                    )}
+                    
+                    <div className="p-3">
+                      {selectedUrl.preview_title && (
+                        <p className="font-medium text-dark-900 mb-1">
+                          {selectedUrl.preview_title}
+                        </p>
+                      )}
+                      
+                      {selectedUrl.preview_description && (
+                        <p className="text-sm text-dark-600 line-clamp-2">
+                          {selectedUrl.preview_description}
+                        </p>
+                      )}
+                      
+                      {selectedUrl.preview_updated_at && (
+                        <p className="text-xs text-dark-400 mt-1">
+                          Updated: {formatDateTime(selectedUrl.preview_updated_at)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 p-3 rounded-lg text-center">
+                    <p className="text-sm text-dark-500">No preview available</p>
+                    {selectedUrl.one_time_use && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        Note: One-time use links will expire after first click
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               
               <div className="pt-4 flex justify-between border-t border-gray-200">

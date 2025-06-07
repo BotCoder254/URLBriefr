@@ -54,7 +54,7 @@ const FolderSelector = ({ selectedFolder, onChange }) => {
       if (selectedFolder) {
         setFolders([selectedFolder]);
       } else {
-        setFolders([]);
+      setFolders([]);
       }
     } finally {
       setLoading(false);

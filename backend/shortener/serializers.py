@@ -112,6 +112,16 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
     cloned_from_info = serializers.SerializerMethodField()
     is_tampered = serializers.SerializerMethodField()
     
+    # New one-time use field
+    one_time_use = serializers.BooleanField(required=False)
+    
+    # New preview fields
+    enable_preview = serializers.BooleanField(required=False)
+    preview_image = serializers.URLField(required=False, allow_blank=True, max_length=2000)
+    preview_description = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    preview_title = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    preview_updated_at = serializers.DateTimeField(required=False)
+    
     class Meta:
         model = ShortenedURL
         fields = [
@@ -126,13 +136,17 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             # New security fields
             'enable_ip_restrictions', 'ip_restrictions', 'ip_restriction_ids',
             'spoofing_protection', 'integrity_hash', 'is_tampered',
-            'cloned_from', 'cloned_from_info'
+            'cloned_from', 'cloned_from_info',
+            # New one-time use field
+            'one_time_use',
+            # New preview fields
+            'enable_preview', 'preview_image', 'preview_description', 'preview_title', 'preview_updated_at'
         ]
         read_only_fields = [
             'id', 'created_at', 'last_accessed',
             'access_count', 'full_short_url', 'is_expired',
             'clicks_count', 'qr_code_url', 'integrity_hash',
-            'is_tampered', 'cloned_from_info'
+            'is_tampered', 'cloned_from_info', 'preview_updated_at'
         ]
         extra_kwargs = {
             'user': {'required': False},
@@ -392,6 +406,12 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
     brand_name = serializers.CharField(required=False, allow_blank=True, max_length=100)
     brand_logo_url = serializers.URLField(required=False, allow_blank=True, max_length=2000)
     
+    # One-time use link
+    one_time_use = serializers.BooleanField(required=False, default=False)
+    
+    # Preview settings
+    enable_preview = serializers.BooleanField(required=False, default=False)
+    
     class Meta:
         model = ShortenedURL
         fields = [
@@ -400,7 +420,8 @@ class CreateShortenedURLSerializer(serializers.ModelSerializer):
             'is_active', 'is_ab_test', 'variants', 'tag_ids',
             'new_tags', 'folder',
             'use_redirect_page', 'redirect_page_type', 'redirect_delay',
-            'custom_redirect_message', 'brand_name', 'brand_logo_url'
+            'custom_redirect_message', 'brand_name', 'brand_logo_url',
+            'one_time_use', 'enable_preview'
         ]
     
     def to_representation(self, instance):
@@ -640,6 +661,12 @@ class CloneURLSerializer(serializers.Serializer):
     custom_redirect_message = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     brand_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     brand_logo_url = serializers.URLField(required=False, allow_blank=True, allow_null=True)
+    
+    # One-time use link
+    one_time_use = serializers.BooleanField(required=False)
+    
+    # Preview settings
+    enable_preview = serializers.BooleanField(required=False)
     
     # Tags
     tag_ids = serializers.PrimaryKeyRelatedField(

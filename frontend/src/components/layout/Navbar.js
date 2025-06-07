@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMenu, FiX, FiUser, FiLogOut, FiLink, FiPieChart, FiGitBranch, FiTag, FiShield } from 'react-icons/fi';
+import { FiMenu, FiX, FiUser, FiLogOut, FiLink, FiPieChart, FiGitBranch, FiTag, FiShield, FiMoon, FiSun } from 'react-icons/fi';
 import useAuth from '../../hooks/useAuth';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const Navbar = () => {
   const { isLoggedIn, currentUser, logout } = useAuth();
+  const { darkMode, toggleDarkMode } = useTheme();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -28,7 +30,7 @@ const Navbar = () => {
   };
   
   return (
-    <nav className="bg-white shadow-sm">
+    <nav className="bg-white dark:bg-dark-800 shadow-sm dark:shadow-gray-700">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo and brand */}
@@ -44,7 +46,7 @@ const Navbar = () => {
               </motion.div>
               <motion.span 
                 whileHover={{ color: '#0ea5e9' }}
-                className="text-xl font-display font-bold text-dark-900 transition-colors"
+                className="text-xl font-display font-bold text-dark-900 dark:text-white transition-colors"
               >
                 URLBriefr
               </motion.span>
@@ -52,32 +54,32 @@ const Navbar = () => {
             
             {/* Desktop navigation */}
             <div className="hidden md:ml-6 md:flex md:space-x-6">
-              <Link to="/" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
+              <Link to="/" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 dark:text-dark-200 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
                 Home
               </Link>
               
               {isLoggedIn && (
                 <>
-                  <Link to="/dashboard" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
+                  <Link to="/dashboard" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 dark:text-dark-200 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
                     Dashboard
                   </Link>
-                  <Link to="/analytics" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
+                  <Link to="/analytics" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 dark:text-dark-200 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
                     Analytics
                   </Link>
-                  <Link to="/ab-testing" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
+                  <Link to="/ab-testing" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 dark:text-dark-200 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
                     A/B Testing
                   </Link>
-                  <Link to="/organize" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
+                  <Link to="/organize" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 dark:text-dark-200 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
                     Organize
                   </Link>
                 </>
               )}
               
-              <Link to="/pricing" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
+              <Link to="/pricing" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 dark:text-dark-200 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
                 Pricing
               </Link>
               
-              <Link to="/about" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
+              <Link to="/about" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 dark:text-dark-200 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
                 About
               </Link>
             </div>
@@ -85,6 +87,19 @@ const Navbar = () => {
           
           {/* Right section: auth buttons or user menu */}
           <div className="flex items-center">
+            {/* Dark mode toggle */}
+            <button
+              onClick={toggleDarkMode}
+              className="p-2 rounded-full text-dark-700 dark:text-dark-200 hover:bg-gray-100 dark:hover:bg-dark-700 mr-2"
+              aria-label="Toggle dark mode"
+            >
+              {darkMode ? (
+                <FiSun className="h-5 w-5" />
+              ) : (
+                <FiMoon className="h-5 w-5" />
+              )}
+            </button>
+
             {isLoggedIn ? (
               <div className="hidden md:ml-4 md:flex md:items-center">
                 <div className="ml-3 relative">
@@ -94,7 +109,7 @@ const Navbar = () => {
                       className="flex items-center max-w-xs rounded-full text-sm focus:outline-none"
                       onClick={() => setIsProfileOpen(!isProfileOpen)}
                     >
-                      <span className="mr-2 text-dark-700">{currentUser?.first_name || currentUser?.email}</span>
+                      <span className="mr-2 text-dark-700 dark:text-dark-200">{currentUser?.first_name || currentUser?.email}</span>
                       <div className="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center text-white">
                         {currentUser?.first_name?.[0]?.toUpperCase() || 'U'}
                       </div>
@@ -107,11 +122,11 @@ const Navbar = () => {
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        className="origin-top-right absolute right-0 mt-2 w-48 rounded-xl shadow-lg bg-white ring-1 ring-black ring-opacity-5 py-1"
+                        className="origin-top-right absolute right-0 mt-2 w-48 rounded-xl shadow-lg bg-white dark:bg-dark-800 ring-1 ring-black ring-opacity-5 dark:ring-dark-700 py-1"
                       >
                         <Link 
                           to="/profile" 
-                          className="flex items-center px-4 py-2 text-sm text-dark-700 hover:bg-gray-100"
+                          className="flex items-center px-4 py-2 text-sm text-dark-700 dark:text-dark-200 hover:bg-gray-100 dark:hover:bg-dark-700"
                           onClick={() => setIsProfileOpen(false)}
                         >
                           <FiUser className="mr-2" /> Profile
@@ -119,7 +134,7 @@ const Navbar = () => {
                         
                         <Link 
                           to="/dashboard" 
-                          className="flex items-center px-4 py-2 text-sm text-dark-700 hover:bg-gray-100"
+                          className="flex items-center px-4 py-2 text-sm text-dark-700 dark:text-dark-200 hover:bg-gray-100 dark:hover:bg-dark-700"
                           onClick={() => setIsProfileOpen(false)}
                         >
                           <FiLink className="mr-2" /> My URLs
@@ -127,7 +142,7 @@ const Navbar = () => {
                         
                         <Link 
                           to="/analytics" 
-                          className="flex items-center px-4 py-2 text-sm text-dark-700 hover:bg-gray-100"
+                          className="flex items-center px-4 py-2 text-sm text-dark-700 dark:text-dark-200 hover:bg-gray-100 dark:hover:bg-dark-700"
                           onClick={() => setIsProfileOpen(false)}
                         >
                           <FiPieChart className="mr-2" /> Analytics
@@ -135,7 +150,7 @@ const Navbar = () => {
                         
                         <Link 
                           to="/ab-testing" 
-                          className="flex items-center px-4 py-2 text-sm text-dark-700 hover:bg-gray-100"
+                          className="flex items-center px-4 py-2 text-sm text-dark-700 dark:text-dark-200 hover:bg-gray-100 dark:hover:bg-dark-700"
                           onClick={() => setIsProfileOpen(false)}
                         >
                           <FiGitBranch className="mr-2" /> A/B Testing
@@ -143,7 +158,7 @@ const Navbar = () => {
                         
                         <Link 
                           to="/organize" 
-                          className="flex items-center px-4 py-2 text-sm text-dark-700 hover:bg-gray-100"
+                          className="flex items-center px-4 py-2 text-sm text-dark-700 dark:text-dark-200 hover:bg-gray-100 dark:hover:bg-dark-700"
                           onClick={() => setIsProfileOpen(false)}
                         >
                           <FiTag className="mr-2" /> Organize
@@ -151,14 +166,14 @@ const Navbar = () => {
                         
                         <Link 
                           to="/security" 
-                          className="flex items-center px-4 py-2 text-sm text-dark-700 hover:bg-gray-100"
+                          className="flex items-center px-4 py-2 text-sm text-dark-700 dark:text-dark-200 hover:bg-gray-100 dark:hover:bg-dark-700"
                           onClick={() => setIsProfileOpen(false)}
                         >
                           <FiShield className="mr-2" /> Security
                         </Link>
                         
                         <button 
-                          className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                          className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-dark-700"
                           onClick={handleLogout}
                         >
                           <FiLogOut className="mr-2" /> Logout
@@ -170,7 +185,7 @@ const Navbar = () => {
               </div>
             ) : (
               <div className="hidden md:flex md:items-center md:space-x-2">
-                <Link to="/login" className="btn btn-outline">
+                <Link to="/login" className="btn btn-outline dark:text-white">
                   Sign in
                 </Link>
                 <Link to="/register" className="btn btn-primary">
@@ -183,7 +198,7 @@ const Navbar = () => {
             <div className="flex items-center md:hidden">
               <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="inline-flex items-center justify-center p-2 rounded-md text-dark-700 hover:text-dark-900 hover:bg-gray-100 focus:outline-none"
+                className="inline-flex items-center justify-center p-2 rounded-md text-dark-700 dark:text-dark-200 hover:text-dark-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-dark-700 focus:outline-none"
               >
                 <span className="sr-only">{isOpen ? 'Close menu' : 'Open menu'}</span>
                 {isOpen ? (
@@ -205,139 +220,113 @@ const Navbar = () => {
             animate="open"
             exit="closed"
             variants={menuVariants}
-            className="md:hidden bg-white shadow-lg rounded-b-xl"
+            className="md:hidden bg-white dark:bg-dark-800 shadow-md"
           >
             <div className="px-2 pt-2 pb-3 space-y-1">
-              <motion.div variants={itemVariants}>
                 <Link 
                   to="/" 
-                  className="block px-3 py-2 rounded-md text-base font-medium text-dark-700 hover:text-primary-600 hover:bg-gray-50"
+                className="block px-3 py-2 rounded-md text-base font-medium text-dark-900 dark:text-white hover:bg-gray-100 dark:hover:bg-dark-700"
                   onClick={() => setIsOpen(false)}
                 >
                   Home
                 </Link>
-              </motion.div>
               
-              {isLoggedIn && (
+              {isLoggedIn ? (
                 <>
-                  <motion.div variants={itemVariants}>
                     <Link 
                       to="/dashboard" 
-                      className="block px-3 py-2 rounded-md text-base font-medium text-dark-700 hover:text-primary-600 hover:bg-gray-50"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-dark-900 dark:text-white hover:bg-gray-100 dark:hover:bg-dark-700"
                       onClick={() => setIsOpen(false)}
                     >
                       Dashboard
                     </Link>
-                  </motion.div>
                   
-                  <motion.div variants={itemVariants}>
                     <Link 
                       to="/analytics" 
-                      className="block px-3 py-2 rounded-md text-base font-medium text-dark-700 hover:text-primary-600 hover:bg-gray-50"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-dark-900 dark:text-white hover:bg-gray-100 dark:hover:bg-dark-700"
                       onClick={() => setIsOpen(false)}
                     >
                       Analytics
                     </Link>
-                  </motion.div>
                   
-                  <motion.div variants={itemVariants}>
                     <Link 
                       to="/ab-testing" 
-                      className="block px-3 py-2 rounded-md text-base font-medium text-dark-700 hover:text-primary-600 hover:bg-gray-50"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-dark-900 dark:text-white hover:bg-gray-100 dark:hover:bg-dark-700"
                       onClick={() => setIsOpen(false)}
                     >
                       A/B Testing
                     </Link>
-                  </motion.div>
-                </>
-              )}
               
-              <motion.div variants={itemVariants}>
                 <Link 
-                  to="/pricing" 
-                  className="block px-3 py-2 rounded-md text-base font-medium text-dark-700 hover:text-primary-600 hover:bg-gray-50"
+                    to="/organize"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-dark-900 dark:text-white hover:bg-gray-100 dark:hover:bg-dark-700"
                   onClick={() => setIsOpen(false)}
                 >
-                  Pricing
+                    Organize
                 </Link>
-              </motion.div>
               
-              <motion.div variants={itemVariants}>
                 <Link 
-                  to="/about" 
-                  className="block px-3 py-2 rounded-md text-base font-medium text-dark-700 hover:text-primary-600 hover:bg-gray-50"
+                    to="/security"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-dark-900 dark:text-white hover:bg-gray-100 dark:hover:bg-dark-700"
                   onClick={() => setIsOpen(false)}
                 >
-                  About
+                    Security
                 </Link>
-              </motion.div>
               
-              {isLoggedIn ? (
-                <>
-                  <motion.div variants={itemVariants}>
                     <Link 
                       to="/profile" 
-                      className="block px-3 py-2 rounded-md text-base font-medium text-dark-700 hover:text-primary-600 hover:bg-gray-50"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-dark-900 dark:text-white hover:bg-gray-100 dark:hover:bg-dark-700"
                       onClick={() => setIsOpen(false)}
                     >
                       Profile
                     </Link>
-                  </motion.div>
                   
-                  <motion.div variants={itemVariants}>
-                    <Link 
-                      to="/organize" 
-                      className="block px-3 py-2 rounded-md text-base font-medium text-dark-700 hover:text-primary-600 hover:bg-gray-50"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      Organize
-                    </Link>
-                  </motion.div>
-                  
-                  <motion.div variants={itemVariants}>
-                    <Link 
-                      to="/security" 
-                      className="block px-3 py-2 rounded-md text-base font-medium text-dark-700 hover:text-primary-600 hover:bg-gray-50"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      Security
-                    </Link>
-                  </motion.div>
-                  
-                  <motion.div variants={itemVariants}>
                     <button 
-                      className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-gray-50"
-                      onClick={() => {
-                        handleLogout();
-                        setIsOpen(false);
-                      }}
+                    className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-gray-100 dark:hover:bg-dark-700"
+                    onClick={() => { setIsOpen(false); handleLogout(); }}
                     >
                       Logout
                     </button>
-                  </motion.div>
                 </>
               ) : (
-                <div className="mt-4 flex flex-col space-y-2 px-3">
-                  <motion.div variants={itemVariants}>
+                <>
+                  <Link 
+                    to="/pricing"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-dark-900 dark:text-white hover:bg-gray-100 dark:hover:bg-dark-700"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Pricing
+                  </Link>
+                  
+                  <Link 
+                    to="/about"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-dark-900 dark:text-white hover:bg-gray-100 dark:hover:bg-dark-700"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    About
+                  </Link>
+                  
+                  <div className="pt-4 pb-3 border-t border-gray-200 dark:border-dark-700">
+                    <div className="flex items-center px-4">
+                      <div className="flex-shrink-0">
                     <Link 
                       to="/login" 
-                      className="btn btn-outline w-full"
+                          className="block w-full px-4 py-2 text-center font-medium rounded-md text-dark-900 dark:text-white bg-gray-100 dark:bg-dark-700 hover:bg-gray-200 dark:hover:bg-dark-600 mb-2"
                       onClick={() => setIsOpen(false)}
                     >
                       Sign in
                     </Link>
-                  </motion.div>
-                  
-                  <motion.div variants={itemVariants}>
                     <Link 
                       to="/register" 
-                      className="btn btn-primary w-full"
+                          className="block w-full px-4 py-2 text-center font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
                       onClick={() => setIsOpen(false)}
                     >
                       Sign up
                     </Link>
-                  </motion.div>
+                      </div>
+                    </div>
                 </div>
+                </>
               )}
             </div>
           </motion.div>

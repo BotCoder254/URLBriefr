@@ -127,6 +127,16 @@ class ShortenedURL(models.Model):
     ip_restrictions = models.ManyToManyField(IPRestriction, related_name='urls', blank=True)
     spoofing_protection = models.BooleanField(default=False, help_text="Enable protection against link spoofing")
     
+    # One-time use link feature
+    one_time_use = models.BooleanField(default=False, help_text="Link expires after first use")
+    
+    # Live preview feature
+    enable_preview = models.BooleanField(default=False, help_text="Enable live preview of destination content")
+    preview_image = models.URLField(max_length=2000, blank=True, null=True, help_text="URL to preview image of destination")
+    preview_description = models.TextField(blank=True, null=True, help_text="Description of destination content")
+    preview_title = models.CharField(max_length=255, blank=True, null=True, help_text="Title of destination content")
+    preview_updated_at = models.DateTimeField(null=True, blank=True, help_text="When the preview was last updated")
+    
     # Cloning info
     cloned_from = models.ForeignKey(
         'self', 
