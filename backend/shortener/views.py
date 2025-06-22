@@ -3,11 +3,11 @@ from rest_framework import viewsets, permissions, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view, permission_classes
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import ShortenedURL, Tag, ABTestVariant, IPRestriction, SpoofingAttempt
+from .models import ShortenedURL, Tag, ABTestVariant, IPRestriction, SpoofingAttempt, MalwareDetectionResult
 from .serializers import (
     ShortenedURLSerializer, CreateShortenedURLSerializer, TagSerializer, 
     ABTestVariantSerializer, IPRestrictionSerializer, SpoofingAttemptSerializer,
-    CloneURLSerializer
+    CloneURLSerializer, MalwareDetectionResultSerializer
 )
 from analytics.models import ClickEvent, UserSession
 from django.http import HttpResponseRedirect, HttpResponse
@@ -95,6 +95,24 @@ class SpoofingAttemptViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = SpoofingAttemptSerializer
     permission_classes = [permissions.IsAdminUser]
     queryset = SpoofingAttempt.objects.all().order_by('-attempt_time')
+
+
+class MalwareDetectionResultViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for viewing malware detection results (read-only)."""
+    serializer_class = MalwareDetectionResultSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['status']
+    
+    def get_queryset(self):
+        """Get malware detection results for the current user."""
+        user = self.request.user
+        if user.is_authenticated:
+            # Get results for URLs owned by this user
+            return MalwareDetectionResult.objects.filter(
+                shortened_url__user=user
+            ).order_by('-scan_date')
+        return MalwareDetectionResult.objects.none()
 
 
 class ShortenedURLViewSet(viewsets.ModelViewSet):
@@ -373,7 +391,61 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
             'valid': is_valid,
             'hash': url.integrity_hash
         })
+    
+    @action(detail=True, methods=['post'])
+    def scan_for_malware(self, request, pk=None):
+        """Scan a URL for malware."""
+        url = self.get_object()
         
+        try:
+            # Initiate the scan
+            detection_result = url.scan_for_malware()
+            
+            # Return the current status
+            return Response({
+                'success': True,
+                'message': 'Malware scan initiated',
+                'status': detection_result.status if detection_result else 'pending',
+                'details': detection_result.details if detection_result else 'Scan in progress'
+            })
+        except Exception as e:
+            # Log the error and return a friendly response
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error scanning URL {url.id} for malware: {str(e)}")
+            
+            return Response({
+                'success': False,
+                'message': 'Failed to initiate malware scan',
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['post'])
+    def toggle_favorite(self, request, pk=None):
+        """Toggle the favorite status of a URL."""
+        url = self.get_object()
+        
+        try:
+            # Toggle the favorite status
+            new_status = url.toggle_favorite()
+            
+            return Response({
+                'success': True,
+                'message': f'URL {"added to" if new_status else "removed from"} favorites',
+                'is_favorite': new_status
+            })
+        except Exception as e:
+            # Log the error and return a friendly response
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error toggling favorite status for URL {url.id}: {str(e)}")
+            
+            return Response({
+                'success': False,
+                'message': 'Failed to toggle favorite status',
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
     def get_queryset(self):
         """Get the queryset based on user role."""
         user = self.request.user

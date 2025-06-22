@@ -29,6 +29,7 @@ import SecuritySettingsPage from './pages/SecuritySettingsPage';
 import URLPreviewPage from './pages/URLPreviewPage';
 import AboutPage from './pages/AboutPage';
 import LearnMorePage from './pages/LearnMorePage';
+import MalwareDetectionPage from './pages/MalwareDetectionPage';
 
 function App() {
   return (
@@ -160,6 +161,15 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            
+            {/* Add Malware Detection route */}
+            <Route path="/security/malware" element={
+              <ProtectedRoute>
+                <Layout>
+                  <MalwareDetectionPage />
+                </Layout>
+              </ProtectedRoute>
+            } />
             
             {/* Catch-all route for 404 */}
             <Route

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ShortenedURL, ABTestVariant, Tag, IPRestriction, SpoofingAttempt
+from .models import ShortenedURL, ABTestVariant, Tag, IPRestriction, SpoofingAttempt, MalwareDetectionResult
 from analytics.models import ClickEvent
 from django.conf import settings
 from django.utils import timezone
@@ -57,6 +57,14 @@ class SpoofingAttemptSerializer(serializers.ModelSerializer):
         model = SpoofingAttempt
         fields = ['id', 'ip_address', 'user_agent', 'attempt_time', 'short_code', 'reason']
         read_only_fields = ['id', 'attempt_time']
+
+class MalwareDetectionResultSerializer(serializers.ModelSerializer):
+    """Serializer for malware detection results."""
+    
+    class Meta:
+        model = MalwareDetectionResult
+        fields = ['id', 'url', 'status', 'scan_date', 'details', 'threat_types', 'confidence_score']
+        read_only_fields = ['id', 'scan_date']
 
 class ABTestVariantSerializer(serializers.ModelSerializer):
     """Serializer for A/B test variants."""
@@ -122,6 +130,13 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
     preview_title = serializers.CharField(required=False, allow_blank=True, max_length=100)
     preview_updated_at = serializers.DateTimeField(required=False)
     
+    # New favorite field
+    is_favorite = serializers.BooleanField(required=False)
+    
+    # Malware detection field
+    malware_detection = MalwareDetectionResultSerializer(read_only=True)
+    malware_status = serializers.SerializerMethodField()
+    
     class Meta:
         model = ShortenedURL
         fields = [
@@ -133,20 +148,25 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             'use_redirect_page', 'redirect_page_type', 'redirect_delay',
             'custom_redirect_message', 'brand_name', 'brand_logo_url',
             'expiration_type', 'expiration_days', 'expiration_date',
-            # New security fields
+            # Security fields
             'enable_ip_restrictions', 'ip_restrictions', 'ip_restriction_ids',
             'spoofing_protection', 'integrity_hash', 'is_tampered',
             'cloned_from', 'cloned_from_info',
-            # New one-time use field
+            # One-time use field
             'one_time_use',
-            # New preview fields
-            'enable_preview', 'preview_image', 'preview_description', 'preview_title', 'preview_updated_at'
+            # Preview fields
+            'enable_preview', 'preview_image', 'preview_description', 'preview_title', 'preview_updated_at',
+            # Favorite field
+            'is_favorite',
+            # Malware detection fields
+            'malware_detection', 'malware_status'
         ]
         read_only_fields = [
             'id', 'created_at', 'last_accessed',
             'access_count', 'full_short_url', 'is_expired',
             'clicks_count', 'qr_code_url', 'integrity_hash',
-            'is_tampered', 'cloned_from_info', 'preview_updated_at'
+            'is_tampered', 'cloned_from_info', 'preview_updated_at',
+            'malware_detection', 'malware_status'
         ]
         extra_kwargs = {
             'user': {'required': False},
@@ -164,7 +184,8 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             'is_ab_test': {'required': False},
             'cloned_from': {'required': False},
             'enable_ip_restrictions': {'required': False},
-            'spoofing_protection': {'required': False}
+            'spoofing_protection': {'required': False},
+            'is_favorite': {'required': False}
         }
     
     def get_full_short_url(self, obj):
@@ -198,29 +219,32 @@ class ShortenedURLSerializer(serializers.ModelSerializer):
             'id': obj.cloned_from.id,
             'short_code': obj.cloned_from.short_code,
             'title': obj.cloned_from.title,
-            'original_url': obj.cloned_from.original_url
+        }
+        
+    def get_malware_status(self, obj):
+        """Get the malware detection status if available."""
+        if not obj.malware_detection:
+            return {
+                'status': 'not_scanned',
+                'details': 'This URL has not been scanned for threats.'
+            }
+        
+        return {
+            'status': obj.malware_detection.status,
+            'details': obj.malware_detection.details,
+            'confidence': obj.malware_detection.confidence_score,
+            'scan_date': obj.malware_detection.scan_date
         }
     
     def to_representation(self, instance):
-        """Custom representation to handle RelatedManager objects."""
+        """Customize the output representation."""
+        # Start with the default representation
         representation = super().to_representation(instance)
         
-        # Ensure tags are properly serialized
-        if 'tags' in representation and representation['tags'] is None:
-            representation['tags'] = []
-            
-        # Ensure expires_at is included and properly formatted
-        if hasattr(instance, 'expires_at'):
-            if instance.expires_at is not None:
-                # Format the date explicitly to ensure it's included
-                representation['expires_at'] = instance.expires_at.isoformat()
-            else:
-                # If it's None, make sure it's explicitly null in the response
-                representation['expires_at'] = None
-                
-        # Debug log
-        print(f"to_representation for URL ID {getattr(instance, 'id', 'unknown')}: expires_at in response: {'expires_at' in representation}")
-            
+        # Log when expires_at is included in response
+        if 'expires_at' in representation:
+            print(f"to_representation for URL ID {instance.id}: expires_at in response: {representation['expires_at'] is not None}")
+        
         return representation
     
     def create(self, validated_data):

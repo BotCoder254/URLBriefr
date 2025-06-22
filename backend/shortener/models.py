@@ -68,6 +68,29 @@ class IPRestriction(models.Model):
             return False
 
 
+class MalwareDetectionResult(models.Model):
+    """Model to store malware detection results for URLs."""
+    STATUS_CHOICES = [
+        ('clean', 'Clean'),
+        ('suspicious', 'Suspicious'),
+        ('malicious', 'Malicious'),
+        ('phishing', 'Phishing'),
+        ('spam', 'Spam'),
+        ('pending', 'Pending Scan'),
+        ('error', 'Scan Error'),
+    ]
+    
+    url = models.URLField(max_length=2000)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    scan_date = models.DateTimeField(auto_now=True)
+    details = models.TextField(blank=True, null=True)
+    threat_types = models.JSONField(default=dict, blank=True, null=True)
+    confidence_score = models.FloatField(default=0.0)  # 0-1 score for confidence in detection
+    
+    def __str__(self):
+        return f"{self.url[:50]}... - {self.status}"
+
+
 class ShortenedURL(models.Model):
     """Model to store shortened URLs."""
     
@@ -102,6 +125,18 @@ class ShortenedURL(models.Model):
     
     # Folder/organization
     folder = models.CharField(max_length=100, blank=True, null=True)
+    
+    # Favorite feature
+    is_favorite = models.BooleanField(default=False)
+    
+    # Malware detection
+    malware_detection = models.OneToOneField(
+        MalwareDetectionResult,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='shortened_url'
+    )
     
     # Custom redirect page settings
     use_redirect_page = models.BooleanField(default=False)
@@ -252,11 +287,68 @@ class ShortenedURL(models.Model):
             if restriction.is_ip_match(ip_address):
                 return False
                 
-        # If not in block list, allow access
+        # If not in any block list, allow access
         return True
+        
+    def toggle_favorite(self):
+        """Toggle the favorite status of the URL."""
+        self.is_favorite = not self.is_favorite
+        self.save(update_fields=['is_favorite'])
+        return self.is_favorite
+    
+    def scan_for_malware(self):
+        """Initiate a scan for malware and phishing."""
+        from .tasks import scan_url_for_threats
+        
+        # Create or update malware detection result
+        if self.malware_detection:
+            detection_result = self.malware_detection
+        else:
+            detection_result = MalwareDetectionResult(url=self.original_url)
+            detection_result.save()
+            self.malware_detection = detection_result
+            self.save(update_fields=['malware_detection'])
+            
+        # Set status to pending
+        detection_result.status = 'pending'
+        detection_result.save(update_fields=['status'])
+        
+        try:
+            # Try to use Celery for asynchronous processing
+            scan_url_for_threats.delay(self.id)
+            detection_result.details = "Scan in progress..."
+            detection_result.save(update_fields=['details'])
+        except Exception as e:
+            # If Celery is not available or fails, handle the scan directly
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to queue malware scan task: {str(e)}")
+            
+            try:
+                # Try to perform a simple scan directly
+                from .tasks import simple_url_safety_check
+                result = simple_url_safety_check(self.original_url)
+                detection_result.status = result['status']
+                detection_result.details = result['details'] + " (Performed synchronously due to worker unavailability)"
+                detection_result.confidence_score = result['confidence']
+                detection_result.save()
+                logger.info(f"Performed synchronous fallback scan for URL {self.id}: {result['status']}")
+            except Exception as inner_e:
+                logger.error(f"Failed to perform direct scan: {str(inner_e)}")
+                detection_result.status = 'error'
+                detection_result.details = f"Scan failed: Worker unavailable and direct scan error: {str(inner_e)}"
+                detection_result.save()
+            
+        return {
+            'success': True,
+            'message': 'Scan initiated',
+            'status': detection_result.status,
+            'details': detection_result.details,
+            'fallback_used': 'worker unavailable' in detection_result.details if detection_result.details else False
+        }
     
     def clone(self, user=None, modifications=None):
-        """Create a clone of this URL with optional modifications."""
+        """Clone this URL with optional modifications."""
         if modifications is None:
             modifications = {}
             
@@ -301,7 +393,7 @@ class ShortenedURL(models.Model):
         
     @classmethod
     def deactivate_expired_urls(cls):
-        """Find and deactivate all expired URLs."""
+        """Deactivate all URLs that have expired."""
         now = timezone.now()
         expired_urls = cls.objects.filter(
             expires_at__lt=now,

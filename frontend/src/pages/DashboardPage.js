@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiLink, FiCopy, FiTrash2, FiEdit, FiPlus, FiX, FiAlertCircle, FiCheckCircle, FiExternalLink, FiSearch, FiBarChart2, FiToggleLeft, FiToggleRight, FiCalendar, FiClock, FiEye, FiGrid, FiTag, FiFolder, FiFilter, FiSettings } from 'react-icons/fi';
+import { FiLink, FiCopy, FiTrash2, FiEdit, FiPlus, FiX, FiAlertCircle, FiCheckCircle, FiExternalLink, FiSearch, FiBarChart2, FiToggleLeft, FiToggleRight, FiCalendar, FiClock, FiEye, FiGrid, FiTag, FiFolder, FiFilter, FiSettings, FiStar } from 'react-icons/fi';
 import urlService from '../services/urlService';
 import QRCodeModal from '../components/url/QRCodeModal';
 import ABTestingForm from '../components/url/ABTestingForm';
@@ -11,6 +11,8 @@ import TagBadge from '../components/url/TagBadge';
 import TagManagementModal from '../components/url/TagManagementModal';
 import FolderManagementModal from '../components/url/FolderManagementModal';
 import AdvancedOptionsForm from '../components/url/AdvancedOptionsForm';
+import FavoriteButton from '../components/url/FavoriteButton';
+import MalwareStatusIndicator from '../components/url/MalwareStatusIndicator';
 import { toast } from 'react-hot-toast';
 
 const DashboardPage = () => {
@@ -89,6 +91,9 @@ const DashboardPage = () => {
   });
   const [cloneLoading, setCloneLoading] = useState(false);
   
+  // New state for favorite filter
+  const [filterFavorites, setFilterFavorites] = useState(false);
+  
   // Get tomorrow's date in YYYY-MM-DD format for min date in date picker
   const getTomorrowDate = () => {
     const tomorrow = new Date();
@@ -119,6 +124,11 @@ const DashboardPage = () => {
         filters.search = searchTerm;
       }
       
+      // Add favorites filter
+      if (filterFavorites) {
+        filters.is_favorite = true;
+      }
+      
       const data = await urlService.getUserUrls(filters);
       setUrls(data);
       setError(null);
@@ -128,7 +138,7 @@ const DashboardPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [filterTags, filterFolder, searchTerm]);
+  }, [filterTags, filterFolder, searchTerm, filterFavorites]);
   
   useEffect(() => {
     fetchUrls();
@@ -811,6 +821,36 @@ const DashboardPage = () => {
     }
   };
   
+  // Add handler for favorite toggle
+  const handleToggleFavorite = async (urlId, isFavorite) => {
+    try {
+      // Update the URL in the local state
+      setUrls(prevUrls =>
+        prevUrls.map(url =>
+          url.id === urlId ? { ...url, is_favorite: isFavorite } : url
+        )
+      );
+    } catch (err) {
+      console.error('Error toggling favorite status:', err);
+      toast.error('Failed to update favorite status');
+    }
+  };
+  
+  // Add handler for malware status change
+  const handleMalwareStatusChange = async (urlId, status) => {
+    try {
+      // Update the URL in the local state with the new malware status
+      setUrls(prevUrls =>
+        prevUrls.map(url =>
+          url.id === urlId ? { ...url, malware_status: status } : url
+        )
+      );
+    } catch (err) {
+      console.error('Error updating malware status:', err);
+      toast.error('Failed to update malware status');
+    }
+  };
+  
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
@@ -914,6 +954,18 @@ const DashboardPage = () => {
                     className="input pl-10"
                   />
                 </div>
+                
+                {/* Favorites toggle button */}
+                <button
+                  onClick={() => {
+                    setFilterFavorites(!filterFavorites);
+                    fetchUrls();
+                  }}
+                  className={`btn ${filterFavorites ? 'btn-primary' : 'btn-outline'} flex items-center`}
+                >
+                  <FiStar className="mr-1" />
+                  <span>Favorites</span>
+                </button>
                 
                 {/* Filter button */}
                 <button
@@ -1047,6 +1099,9 @@ const DashboardPage = () => {
                         Folder
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
+                        Security
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
                         Expiration
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-dark-500 uppercase tracking-wider">
@@ -1084,6 +1139,11 @@ const DashboardPage = () => {
                             >
                               {copied === url.id ? <FiCheckCircle className="text-accent-500" /> : <FiCopy />}
                             </button>
+                            <FavoriteButton 
+                              urlId={url.id} 
+                              isFavorite={url.is_favorite} 
+                              onToggle={handleToggleFavorite} 
+                            />
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -1137,6 +1197,13 @@ const DashboardPage = () => {
                           ) : (
                             <span className="text-gray-400">Not in a folder</span>
                           )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-500">
+                          <MalwareStatusIndicator 
+                            urlId={url.id} 
+                            malwareStatus={url.malware_status} 
+                            onStatusChange={handleMalwareStatusChange} 
+                          />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {url.expires_at ? (
@@ -1548,6 +1615,11 @@ const DashboardPage = () => {
                       >
                         {copied === selectedUrl.id ? <FiCheckCircle className="text-accent-500" /> : <FiCopy />}
                       </button>
+                      <FavoriteButton 
+                        urlId={selectedUrl.id} 
+                        isFavorite={selectedUrl.is_favorite} 
+                        onToggle={handleToggleFavorite} 
+                      />
                     </div>
                   </div>
                   
@@ -1651,6 +1723,16 @@ const DashboardPage = () => {
               <div>
                 <p className="text-sm text-dark-500 mb-1">Total Clicks</p>
                 <p className="text-2xl font-display font-bold text-primary-600">{selectedUrl.access_count}</p>
+              </div>
+              
+              {/* Malware detection status */}
+              <div className="border-t border-gray-200 pt-4">
+                <p className="text-sm text-dark-500 mb-2">Security Status</p>
+                <MalwareStatusIndicator 
+                  urlId={selectedUrl.id} 
+                  malwareStatus={selectedUrl.malware_status} 
+                  onStatusChange={handleMalwareStatusChange} 
+                />
               </div>
               
               {/* Preview section */}

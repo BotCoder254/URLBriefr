@@ -191,6 +191,39 @@ const urlService = {
     return response.data;
   },
   
+  // Toggle URL favorite status
+  toggleFavorite: async (id) => {
+    try {
+      const response = await api.post(`/urls/${id}/toggle_favorite/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error toggling favorite status:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Scan URL for malware and phishing
+  scanForMalware: async (id) => {
+    try {
+      const response = await api.post(`/urls/${id}/scan_for_malware/`);
+      return response.data;
+    } catch (error) {
+      console.error('Error scanning URL for malware:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Get malware detection results for all user URLs
+  getMalwareResults: async () => {
+    try {
+      const response = await api.get('/malware-detection/');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting malware results:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
   // Delete a URL
   deleteUrl: async (id) => {
     try {
