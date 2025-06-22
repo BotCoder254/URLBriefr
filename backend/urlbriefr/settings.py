@@ -163,14 +163,48 @@ SIMPLE_JWT = {
 }
 
 # CORS settings
-# Import CORS settings from cors_settings.py
-from .cors_settings import *
+# Instead of importing from cors_settings.py, define settings directly here
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False').lower() == 'true'
 
-# Uncomment this in development if needed
-# CORS_ALLOW_ALL_ORIGINS = True
+DEFAULT_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://urlbriefr-frontend.onrender.com",
+    "https://urlbriefr.netlify.app",
+    "https://urlbriefr.vercel.app",
+]
 
-# The rest of the CORS settings are imported from cors_settings.py
-# If you need to override any settings, do it here
+CORS_ALLOWED_ORIGINS_ENV = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+ADDITIONAL_ORIGINS = [origin.strip() for origin in CORS_ALLOWED_ORIGINS_ENV.split(',') if origin.strip()]
+
+CORS_ALLOWED_ORIGINS = DEFAULT_ALLOWED_ORIGINS + ADDITIONAL_ORIGINS
+
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+CORS_EXPOSE_HEADERS = [
+    'content-disposition',
+]
+
+CORS_ALLOW_CREDENTIALS = True
 
 # URL Shortener settings
 URL_SHORTENER_DOMAIN = 'http://localhost:8000'
