@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/auth/', include('authentication.urls')),
     path('api/', include(shortener_api_urlpatterns)),
     path('api/', include('analytics.urls')),
+    path('api/tempmail/', include('tempmail.urls')),
     
     # URL shortener redirect (non-API endpoint)
     path('', include(shortener_urlpatterns)),

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiMail, FiLock, FiUser, FiAlertCircle } from 'react-icons/fi';
 import useAuth from '../../hooks/useAuth';
@@ -7,6 +7,7 @@ import useAuth from '../../hooks/useAuth';
 const RegisterForm = () => {
   const { register, login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [formData, setFormData] = useState({
     email: '',
@@ -16,6 +17,15 @@ const RegisterForm = () => {
     last_name: '',
     role: 'USER',
   });
+  
+  // Pre-fill email from URL parameters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const emailParam = urlParams.get('email');
+    if (emailParam) {
+      setFormData(prev => ({ ...prev, email: emailParam }));
+    }
+  }, [location.search]);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registerError, setRegisterError] = useState('');

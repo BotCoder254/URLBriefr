@@ -28,6 +28,7 @@ import OrganizePage from './pages/OrganizePage';
 import SecuritySettingsPage from './pages/SecuritySettingsPage';
 import URLPreviewPage from './pages/URLPreviewPage';
 import AboutPage from './pages/AboutPage';
+import TempMailPage from './pages/TempMailPage';
 import LearnMorePage from './pages/LearnMorePage';
 import MalwareDetectionPage from './pages/MalwareDetectionPage';
 
@@ -80,6 +81,16 @@ function App() {
               element={
                 <Layout>
                   <LearnMorePage />
+                </Layout>
+              }
+            />
+            
+            {/* Temporary Email page */}
+            <Route
+              path="/tempmail"
+              element={
+                <Layout>
+                  <TempMailPage />
                 </Layout>
               }
             />

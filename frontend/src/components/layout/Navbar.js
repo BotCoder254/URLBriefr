@@ -64,6 +64,10 @@ const Navbar = () => {
                 Home
               </Link>
               
+              <Link to="/tempmail" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 dark:text-dark-200 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
+                Temp Email
+              </Link>
+              
               {isLoggedIn && (
                 <>
                   <Link to="/dashboard" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 dark:text-dark-200 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
@@ -286,6 +290,14 @@ const Navbar = () => {
                   onClick={() => setIsOpen(false)}
                 >
                   Home
+                </Link>
+                
+                <Link 
+                  to="/tempmail" 
+                  className="block px-3 py-2 rounded-md text-base font-medium text-dark-900 dark:text-white hover:bg-gray-100 dark:hover:bg-dark-700"
+                  onClick={() => setIsOpen(false)}
+                >
+                  Temp Email
                 </Link>
               
               {isLoggedIn ? (

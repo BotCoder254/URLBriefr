@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'authentication',
     'shortener',
     'analytics',
+    'tempmail',
 ]
 
 # Add Anymail to installed apps (commented out - install anymail if needed)
@@ -211,7 +212,7 @@ URL_SHORTENER_DOMAIN = 'http://localhost:8000'
 DEFAULT_URL_LENGTH = 6
 
 # Email settings
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_BACKEND = 'tempmail.email_backend.TempMailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
@@ -227,4 +228,25 @@ EMAIL_VERIFICATION_TIMEOUT_DAYS = 7
 ANYMAIL = {
     "MAILGUN_API_KEY": os.environ.get('MAILGUN_API_KEY', '62143d0f14ee4b18fe2f4a7c6af6e2eb-08c79601-bb7b1a06'),
     "MAILGUN_SENDER_DOMAIN": os.environ.get('MAILGUN_DOMAIN', 'urlbriefr.com'),
+}
+
+# Temporary Email Configuration
+TEMPMAIL_DOMAIN = os.environ.get('TEMPMAIL_DOMAIN', 'yourdomain.com')  # Replace with your actual domain
+TEMPMAIL_WEBHOOK_SECRET = os.environ.get('TEMPMAIL_WEBHOOK_SECRET', 'your-webhook-secret')
+
+# Email service configuration for receiving external emails
+EMAIL_SERVICE_CONFIG = {
+    'mailgun': {
+        'webhook_url': '/api/tempmail/receive/',
+        'domain': os.environ.get('MAILGUN_DOMAIN', 'yourdomain.com'),
+        'api_key': os.environ.get('MAILGUN_API_KEY', ''),
+    },
+    'sendgrid': {
+        'webhook_url': '/api/tempmail/receive/',
+        'api_key': os.environ.get('SENDGRID_API_KEY', ''),
+    },
+    'postmark': {
+        'webhook_url': '/api/tempmail/receive/',
+        'server_token': os.environ.get('POSTMARK_SERVER_TOKEN', ''),
+    }
 }

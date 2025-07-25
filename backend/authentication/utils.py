@@ -7,6 +7,13 @@ import os
 
 logger = logging.getLogger(__name__)
 
+# Import tempmail utilities
+try:
+    from tempmail.utils import is_tempmail_address, create_tempmail_session_for_email
+    TEMPMAIL_AVAILABLE = True
+except ImportError:
+    TEMPMAIL_AVAILABLE = False
+
 def send_verification_email(user):
     """
     Send an email verification email to the user.
@@ -18,6 +25,14 @@ def send_verification_email(user):
         bool: True if the email was sent successfully, False otherwise
     """
     try:
+        # If this is a tempmail address, ensure the session exists and is extended
+        if TEMPMAIL_AVAILABLE and is_tempmail_address(user.email):
+            session = create_tempmail_session_for_email(user.email, duration_minutes=60)
+            if session:
+                logger.info(f"Created/extended tempmail session for {user.email}")
+            else:
+                logger.warning(f"Failed to create tempmail session for {user.email}")
+        
         # Record the time the verification email is sent
         user.email_verification_sent_at = timezone.now()
         user.save()
@@ -31,6 +46,7 @@ def send_verification_email(user):
             'user': user,
             'verification_url': verification_url,
             'expiration_days': settings.EMAIL_VERIFICATION_TIMEOUT_DAYS,
+            'is_tempmail': TEMPMAIL_AVAILABLE and is_tempmail_address(user.email),
         }
         
         # Render email template

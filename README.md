@@ -4,12 +4,23 @@ A modern URL shortener with powerful analytics and customization options.
 
 ## Features
 
+### URL Shortening
 - Shorten URLs with custom codes and titles
 - Set expiration dates for URLs (specific date or number of days)
 - Comprehensive analytics dashboard
 - Track clicks by device, browser, OS, and location
 - User authentication and role-based access control
 - Manage and search your shortened URLs
+
+### Temporary Email System
+- **Generate Disposable Emails**: Create random, temporary email addresses instantly
+- **Real-time Inbox**: Receive emails in real-time with live updates
+- **Session Management**: Control email session duration (5-60 minutes)
+- **Email Viewer**: Read emails with HTML support and attachment downloads
+- **Auto-cleanup**: Automatic deletion of expired emails and sessions
+- **No Registration**: Use temporary emails without creating an account
+- **Security Features**: Spam detection and sender blacklisting
+- **Mobile Responsive**: Works seamlessly on all devices
 
 ## Setup and Installation
 
@@ -34,6 +45,55 @@ A modern URL shortener with powerful analytics and customization options.
    ```
    python manage.py runserver
    ```
+
+### Temporary Email Setup
+
+To enable the temporary email system to receive real external emails:
+
+#### Option 1: Using Mailgun (Recommended)
+
+1. **Sign up for Mailgun** at https://www.mailgun.com/
+2. **Add your domain** and verify DNS records
+3. **Configure environment variables**:
+   ```bash
+   export TEMPMAIL_DOMAIN="yourdomain.com"
+   export MAILGUN_API_KEY="your-mailgun-api-key"
+   export MAILGUN_DOMAIN="yourdomain.com"
+   ```
+4. **Set up webhook** in Mailgun dashboard:
+   - URL: `https://yourdomain.com/api/tempmail/receive/`
+   - Events: Select "delivered"
+
+#### Option 2: Using SendGrid
+
+1. **Sign up for SendGrid** at https://sendgrid.com/
+2. **Configure environment variables**:
+   ```bash
+   export TEMPMAIL_DOMAIN="yourdomain.com"
+   export SENDGRID_API_KEY="your-sendgrid-api-key"
+   ```
+3. **Set up Inbound Parse** webhook:
+   - URL: `https://yourdomain.com/api/tempmail/receive/`
+
+#### Option 3: Development Testing
+
+For development/testing without external services:
+1. **Start the email server simulator**:
+   ```bash
+   cd backend
+   python email_server_simulator.py
+   ```
+2. **Configure email client** to send to localhost:1025
+3. **Test with generated addresses** @yourdomain.com
+
+#### DNS Configuration
+
+Add these DNS records for your domain:
+```
+MX    10    mxa.mailgun.org
+MX    10    mxb.mailgun.org
+TXT   "v=spf1 include:mailgun.org ~all"
+```
 
 ### Frontend (React)
 
