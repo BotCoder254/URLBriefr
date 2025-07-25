@@ -1199,6 +1199,7 @@ const DashboardPage = () => {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-500">
+                          {console.log('URL object in table:', { id: url.id, malware_status: url.malware_status, url })}
                           <MalwareStatusIndicator
                             urlId={url.id}
                             malwareStatus={url.malware_status}
@@ -1729,6 +1730,7 @@ const DashboardPage = () => {
                 {/* Malware detection status */}
                 <div className="border-t border-gray-200 pt-4">
                   <p className="text-sm text-dark-500 mb-2">Security Status</p>
+                  {console.log('Selected URL in modal:', { id: selectedUrl.id, malware_status: selectedUrl.malware_status, selectedUrl })}
                   <MalwareStatusIndicator
                     urlId={selectedUrl.id}
                     malwareStatus={selectedUrl.malware_status}
