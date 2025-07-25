@@ -15,8 +15,8 @@ router.register(r'malware-detection', MalwareDetectionResultViewSet, basename='m
 
 # API endpoints
 api_urlpatterns = [
+    path('generate-qr/<str:short_code>/', generate_qr_code, name='qr_code_api'),
     path('', include(router.urls)),
-    path('qr/<str:short_code>/', generate_qr_code, name='qr_code_api'),
 ]
 
 # Non-API endpoints

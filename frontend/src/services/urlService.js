@@ -569,13 +569,15 @@ const urlService = {
   
   // Get QR code image URL for a shortened URL
   getQRCodeUrl: (shortCode) => {
-    return `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/qr/${shortCode}`;
+    return `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/generate-qr/${shortCode}/`;
   },
   
   // Get QR code as base64 data for embedding in pages
   getQRCodeBase64: async (shortCode) => {
     try {
-      const response = await api.get(`/qr/${shortCode}/?format=base64`);
+      const response = await api.get(`/generate-qr/${shortCode}/`, {
+        params: { format: 'base64' }
+      });
       if (response && response.data && response.data.qr_code) {
         return response.data.qr_code;
       }
@@ -602,7 +604,7 @@ const urlService = {
   downloadQRCode: async (shortCode, fileName = null) => {
     try {
       // Create a direct link to download the QR code
-      const qrCodeUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/qr/${shortCode}/`;
+      const qrCodeUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/generate-qr/${shortCode}/`;
       
       // Create an anchor element and simulate a click to download
       const link = document.createElement('a');

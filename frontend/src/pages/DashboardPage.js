@@ -35,7 +35,7 @@ const DashboardPage = () => {
   const [sortBy, setSortBy] = useState('created_at'); // 'created_at', 'access_count', 'short_code'
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc', 'desc'
   const [updatingPreview, setUpdatingPreview] = useState(false);
-  
+
   // New URL form state
   const [newUrl, setNewUrl] = useState({
     original_url: '',
@@ -55,28 +55,28 @@ const DashboardPage = () => {
     redirect_page_type: 'default',
     redirect_delay: 3
   });
-  
+
   // Expiration form state
   const [expirationForm, setExpirationForm] = useState({
     expirationType: 'never',
     expirationDays: '',
     expirationDate: ''
   });
-  
+
   // Form errors
   const [formErrors, setFormErrors] = useState({});
   const [expirationErrors, setExpirationErrors] = useState({});
-  
+
   // Form submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createSuccess, setCreateSuccess] = useState(false);
   const [expirationUpdating, setExpirationUpdating] = useState(false);
-  
+
   // Filter state
   const [filterTags, setFilterTags] = useState([]);
   const [filterFolder, setFilterFolder] = useState('');
   const [activeFilters, setActiveFilters] = useState(false);
-  
+
   // Clone URL form state
   const [cloneData, setCloneData] = useState({
     title: '',
@@ -90,45 +90,45 @@ const DashboardPage = () => {
     spoofing_protection: false
   });
   const [cloneLoading, setCloneLoading] = useState(false);
-  
+
   // New state for favorite filter
   const [filterFavorites, setFilterFavorites] = useState(false);
-  
+
   // Get tomorrow's date in YYYY-MM-DD format for min date in date picker
   const getTomorrowDate = () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().split('T')[0];
   };
-  
+
   // Define fetchUrls before it's used in useEffect
   const fetchUrls = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       // Build filters object
       const filters = {};
-      
+
       // Add tag filters
       if (filterTags.length > 0) {
         filters.tag_id = filterTags.map(tag => tag.id);
       }
-      
+
       // Add folder filter
       if (filterFolder) {
         filters.folder = filterFolder;
       }
-      
+
       // Add search term filter
       if (searchTerm) {
         filters.search = searchTerm;
       }
-      
+
       // Add favorites filter
       if (filterFavorites) {
         filters.is_favorite = true;
       }
-      
+
       const data = await urlService.getUserUrls(filters);
       setUrls(data);
       setError(null);
@@ -139,31 +139,31 @@ const DashboardPage = () => {
       setLoading(false);
     }
   }, [filterTags, filterFolder, searchTerm, filterFavorites]);
-  
+
   useEffect(() => {
     fetchUrls();
   }, []);
-  
+
   useEffect(() => {
     // Apply filters when search term changes, but with a small delay
     const delayDebounceFn = setTimeout(() => {
       fetchUrls();
     }, 500);
-    
+
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm, fetchUrls]);
-  
+
   const handleCreateUrl = async (e) => {
     if (e && e.preventDefault) {
-    e.preventDefault();
+      e.preventDefault();
     }
-    
+
     // Validate form
     const errors = {};
     if (!newUrl.original_url) {
       errors.original_url = 'URL is required';
     }
-    
+
     // If A/B testing is enabled, validate variants
     if (newUrl.is_ab_test) {
       // Check if all variants have destination URLs
@@ -171,40 +171,40 @@ const DashboardPage = () => {
       if (emptyVariants.length > 0) {
         errors.variants = 'All variants must have destination URLs';
       }
-      
+
       // Check if weights sum to 100
       const totalWeight = newUrl.variants.reduce((sum, v) => sum + Number(v.weight), 0);
       if (totalWeight !== 100) {
         errors.variants = `Variant weights must sum to 100% (current: ${totalWeight}%)`;
       }
     }
-    
+
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       return;
     }
-    
+
     setIsSubmitting(true);
     setFormErrors({});
-    
+
     try {
       const urlData = { ...newUrl };
-      
+
       // Clean up empty fields
       Object.keys(urlData).forEach(key => {
         if (!urlData[key] && key !== 'is_active' && key !== 'is_ab_test') delete urlData[key];
       });
-      
+
       // Ensure URL has http/https
       if (!urlData.original_url.startsWith('http://') && !urlData.original_url.startsWith('https://')) {
         urlData.original_url = `https://${urlData.original_url}`;
       }
-      
+
       // Process expiration settings
       if (urlData.expiration_type) {
         // If expiration type is days, ensure we have a number
         if (urlData.expiration_type === 'days' && urlData.expiration_days) {
-        urlData.expiration_days = parseInt(urlData.expiration_days, 10);
+          urlData.expiration_days = parseInt(urlData.expiration_days, 10);
         } else if (urlData.expiration_type === 'none') {
           // If no expiration, remove any expiration dates
           delete urlData.expiration_days;
@@ -214,14 +214,14 @@ const DashboardPage = () => {
         // If no expiration type is set, default to none
         urlData.expiration_type = 'none';
       }
-      
+
       // Remove empty fields from advanced options
       if (!urlData.custom_redirect_message) delete urlData.custom_redirect_message;
       if (!urlData.brand_name) delete urlData.brand_name;
       if (!urlData.brand_logo_url) delete urlData.brand_logo_url;
-      
+
       console.log('Creating URL with data:', urlData);
-      
+
       // If A/B testing is not enabled, remove variants
       if (!urlData.is_ab_test) {
         delete urlData.variants;
@@ -231,18 +231,18 @@ const DashboardPage = () => {
           ...variant,
           weight: Number(variant.weight)
         }));
-        
+
         // Set first variant's destination URL to original URL if empty
         if (!urlData.variants[0].destination_url) {
           urlData.variants[0].destination_url = urlData.original_url;
         }
       }
-      
+
       const response = await urlService.createUrl(urlData);
-      
+
       // Add new URL to list
       setUrls(prevUrls => [response, ...prevUrls]);
-      
+
       // Refresh folders to ensure new folders are displayed
       if (urlData.folder) {
         try {
@@ -251,7 +251,7 @@ const DashboardPage = () => {
           console.warn('Error refreshing folders:', folderErr);
         }
       }
-      
+
       // Reset form
       setNewUrl({
         original_url: '',
@@ -274,23 +274,23 @@ const DashboardPage = () => {
         brand_name: '',
         brand_logo_url: ''
       });
-      
+
       setCreateSuccess(true);
       setTimeout(() => {
         setCreateSuccess(false);
         setShowCreateModal(false);
       }, 2000);
-      
+
     } catch (err) {
       console.error('Error creating URL:', err);
-      
+
       // Get more detailed error information
       const responseData = err.response?.data || {};
       console.log('Error response data:', responseData);
-      
+
       // Check if there's a specific error message
       let errorMessage = 'Failed to create URL. Please try again.';
-      
+
       // Look for specific field errors
       if (typeof responseData === 'object') {
         // Check common field errors
@@ -302,7 +302,7 @@ const DashboardPage = () => {
           responseData.expiration_date?.[0],
           responseData.error
         ].filter(Boolean);
-        
+
         if (fieldErrors.length > 0) {
           errorMessage = fieldErrors[0];
         } else if (typeof responseData === 'string') {
@@ -310,7 +310,7 @@ const DashboardPage = () => {
           errorMessage = responseData;
         }
       }
-      
+
       setFormErrors({
         submit: errorMessage
       });
@@ -318,21 +318,21 @@ const DashboardPage = () => {
       setIsSubmitting(false);
     }
   };
-  
+
   const handleDeleteClick = (url) => {
     setSelectedUrl(url);
     setShowDeleteModal(true);
   };
-  
+
   const confirmDelete = async () => {
     if (!selectedUrl) return;
-    
+
     try {
       await urlService.deleteUrl(selectedUrl.id);
-      
+
       // Remove deleted URL from list
       setUrls(prevUrls => prevUrls.filter(url => url.id !== selectedUrl.id));
-      
+
       setShowDeleteModal(false);
       setSelectedUrl(null);
     } catch (err) {
@@ -340,16 +340,16 @@ const DashboardPage = () => {
       setError('Failed to delete URL. Please try again.');
     }
   };
-  
+
   const handleToggleStatus = async (url) => {
     setStatusToggling(url.id);
-    
+
     try {
       const updatedUrl = await urlService.toggleUrlStatus(url.id, !url.is_active);
-      
+
       // Update URL in list
-      setUrls(prevUrls => 
-        prevUrls.map(item => 
+      setUrls(prevUrls =>
+        prevUrls.map(item =>
           item.id === url.id ? updatedUrl : item
         )
       );
@@ -360,7 +360,7 @@ const DashboardPage = () => {
       setStatusToggling(null);
     }
   };
-  
+
   const handleCopy = (url) => {
     if (!url || !url.full_short_url) {
       console.error('URL or full_short_url is undefined');
@@ -376,14 +376,14 @@ const DashboardPage = () => {
         console.error('Could not copy text: ', err);
       });
   };
-  
+
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
     setNewUrl(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
-    
+
     // Clear form errors
     if (formErrors[name]) {
       setFormErrors(prev => ({
@@ -391,13 +391,13 @@ const DashboardPage = () => {
         [name]: null
       }));
     }
-    
+
     // If enabling A/B testing, set first variant's destination URL to the original URL
     if (name === 'is_ab_test' && checked && newUrl.original_url) {
-      const validatedUrl = newUrl.original_url.startsWith('http') ? 
-        newUrl.original_url : 
+      const validatedUrl = newUrl.original_url.startsWith('http') ?
+        newUrl.original_url :
         `https://${newUrl.original_url}`;
-        
+
       setNewUrl(prev => ({
         ...prev,
         is_ab_test: checked,
@@ -408,27 +408,27 @@ const DashboardPage = () => {
       }));
     }
   };
-  
+
   const handleViewDetails = (url) => {
     setSelectedUrl(url);
     setShowDetailsModal(true);
   };
-  
+
   // Format date string
   const formatDate = (dateString) => {
     // Handle null, undefined, or empty string cases
     if (!dateString) return 'Never';
-    
+
     try {
       // Parse date
-    const date = new Date(dateString);
-      
+      const date = new Date(dateString);
+
       // Check for invalid date
       if (isNaN(date.getTime())) {
         console.warn(`Invalid date format received: "${dateString}"`);
         return 'Never';
       }
-      
+
       // Format date with more details
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
@@ -440,29 +440,29 @@ const DashboardPage = () => {
       return 'Never';
     }
   };
-  
+
   // Format datetime string
   const formatDateTime = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleString();
   };
-  
+
   // Check if URL is expired
   const isExpired = (url) => {
     // If no expiration date, it never expires
     if (!url.expires_at) return false;
-    
+
     try {
       // Parse the expiration date
       const expiryDate = new Date(url.expires_at);
-      
+
       // Check if date is valid
       if (isNaN(expiryDate.getTime())) {
         console.warn(`Invalid expiry date found: "${url.expires_at}" for URL ID ${url.id}`);
         return false;
       }
-      
+
       // Compare with current date
       const now = new Date();
       return expiryDate < now;
@@ -471,42 +471,42 @@ const DashboardPage = () => {
       return false;
     }
   };
-  
+
   // Get the status label for a URL
   const getStatusLabel = (url) => {
     if (!url.is_active) return 'Inactive';
     if (isExpired(url)) return 'Expired';
     return 'Active';
   };
-  
+
   // Get the status color for a URL
   const getStatusColor = (url) => {
     if (!url.is_active) return 'gray-300';
     if (isExpired(url)) return 'red-500';
     return 'accent-500';
   };
-  
+
   // Filter and sort URLs
   const filteredAndSortedUrls = urls
     .filter(url => {
       // Filter by search term
       const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = 
+      const matchesSearch =
         url.original_url.toLowerCase().includes(searchLower) ||
         url.short_code.toLowerCase().includes(searchLower) ||
         (url.title && url.title.toLowerCase().includes(searchLower));
-      
+
       // Filter by status
       if (filterStatus === 'all') return matchesSearch;
       if (filterStatus === 'active') return matchesSearch && url.is_active && !isExpired(url);
       if (filterStatus === 'inactive') return matchesSearch && (!url.is_active || isExpired(url));
-      
+
       return matchesSearch;
     })
     .sort((a, b) => {
       // Sort by selected field
       let valueA, valueB;
-      
+
       if (sortBy === 'access_count') {
         valueA = a.access_count;
         valueB = b.access_count;
@@ -519,10 +519,10 @@ const DashboardPage = () => {
         valueA = new Date(a.created_at).getTime();
         valueB = new Date(b.created_at).getTime();
       }
-      
+
       return sortOrder === 'asc' ? valueA - valueB : valueB - valueA;
     });
-  
+
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -533,22 +533,22 @@ const DashboardPage = () => {
       }
     }
   };
-  
+
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 }
   };
-  
+
   const handleExpirationClick = (url) => {
     setSelectedUrl(url);
-    
+
     // Initialize form based on current URL expiration
     if (url.expires_at) {
       const expiresAt = new Date(url.expires_at);
       const today = new Date();
       const diffTime = Math.abs(expiresAt - today);
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
+
       // Check if it's a standard expiration period
       if (diffDays === 1 || diffDays === 7 || diffDays === 30 || diffDays === 90 || diffDays === 365) {
         setExpirationForm({
@@ -570,14 +570,14 @@ const DashboardPage = () => {
         expirationDate: ''
       });
     }
-    
+
     setShowExpirationModal(true);
   };
-  
+
   const handleExpirationFormChange = (e) => {
     const { name, value } = e.target;
     setExpirationForm(prev => ({ ...prev, [name]: value }));
-    
+
     // Clear error for this field if it exists
     if (expirationErrors[name]) {
       setExpirationErrors(prev => {
@@ -587,79 +587,79 @@ const DashboardPage = () => {
       });
     }
   };
-  
+
   const handleUpdateExpiration = async () => {
     if (!selectedUrl) return;
-    
+
     // Validate form
     const errors = {};
     if (expirationForm.expirationType === 'days' && !expirationForm.expirationDays) {
       errors.expirationDays = 'Please select number of days';
     }
-    
+
     if (expirationForm.expirationType === 'date' && !expirationForm.expirationDate) {
       errors.expirationDate = 'Please select a date';
     }
-    
+
     if (Object.keys(errors).length > 0) {
       setExpirationErrors(errors);
       return;
     }
-    
+
     setExpirationUpdating(true);
     setExpirationErrors({});
-    
+
     try {
       console.log(`Updating URL ID ${selectedUrl.id} expiration to ${expirationForm.expirationType}`);
-      
+
       // First attempt with the specialized endpoint
       let updatedUrl;
-      
+
       try {
-      if (expirationForm.expirationType === 'never') {
-        updatedUrl = await urlService.setUrlExpiration(selectedUrl.id, 'none', null);
-      } else if (expirationForm.expirationType === 'days') {
-        updatedUrl = await urlService.setUrlExpiration(
-          selectedUrl.id, 
-          'days', 
-          parseInt(expirationForm.expirationDays, 10)
-        );
-      } else if (expirationForm.expirationType === 'date') {
+        if (expirationForm.expirationType === 'never') {
+          updatedUrl = await urlService.setUrlExpiration(selectedUrl.id, 'none', null);
+        } else if (expirationForm.expirationType === 'days') {
+          updatedUrl = await urlService.setUrlExpiration(
+            selectedUrl.id,
+            'days',
+            parseInt(expirationForm.expirationDays, 10)
+          );
+        } else if (expirationForm.expirationType === 'date') {
           // Ensure we have a valid date to send
           const dateValue = expirationForm.expirationDate;
           if (!dateValue) {
             throw new Error('Invalid date value');
           }
-          
-        updatedUrl = await urlService.setUrlExpiration(
-          selectedUrl.id,
-          'date',
+
+          updatedUrl = await urlService.setUrlExpiration(
+            selectedUrl.id,
+            'date',
             dateValue
           );
         }
-        
+
         console.log('Initial response from update:', updatedUrl);
       } catch (updateError) {
         console.error('Error during expiration update:', updateError);
         throw updateError;
       }
-      
+
       // Always fetch a fresh copy to make sure we have all fields
       try {
         console.log('Fetching fresh URL data after update');
         const freshUrl = await urlService.getUrlById(selectedUrl.id);
         console.log('Fresh URL data after update:', freshUrl);
-        
+
         if (freshUrl && freshUrl.id) {
           // Check if the expires_at field exists in the fresh data
           if ((expirationForm.expirationType === 'never' && freshUrl.expires_at === null) ||
-              (expirationForm.expirationType !== 'never' && freshUrl.expires_at)) {
+            (expirationForm.expirationType !== 'never' && freshUrl.expires_at)) {
             console.log('Fresh URL data contains correctly set expires_at field:', freshUrl.expires_at);
           } else {
-            console.warn('Fresh URL data may have incorrect expires_at:', freshUrl.expires_at, 
+            console.warn('Fresh URL data may have incorrect expires_at:', freshUrl.expires_at,
               'for expiration type:', expirationForm.expirationType);
           }
-          
+
           // Use the fresh data regardless
           updatedUrl = freshUrl;
         }
@@ -667,22 +667,22 @@ const DashboardPage = () => {
         console.error('Error fetching fresh URL data:', fetchError);
         // Continue with whatever data we have from the update
       }
-      
+
       // Update URL in list with the final data
       if (updatedUrl) {
         // Enhanced logging for debugging
-        console.log(`Updating URL in state with expires_at:`, 
+        console.log(`Updating URL in state with expires_at:`,
           updatedUrl.expires_at !== undefined ? updatedUrl.expires_at : 'UNDEFINED',
           'Full URL data:', updatedUrl
         );
-        
+
         // Always fetch the latest data one more time if expires_at is missing
         if (expirationForm.expirationType !== 'never' && !updatedUrl.expires_at) {
           try {
             console.log('Making one final attempt to get latest URL data with expires_at field');
             const finalAttempt = await urlService.getUrlById(selectedUrl.id);
             console.log('Final data attempt:', finalAttempt);
-            
+
             if (finalAttempt && finalAttempt.id) {
               updatedUrl = finalAttempt;
             }
@@ -690,38 +690,38 @@ const DashboardPage = () => {
             console.error('Error in final data fetch attempt:', finalError);
           }
         }
-        
+
         // Update state with the best data we have
-      setUrls(prevUrls => 
-        prevUrls.map(item => 
-          item.id === selectedUrl.id ? updatedUrl : item
-        )
-      );
+        setUrls(prevUrls =>
+          prevUrls.map(item =>
+            item.id === selectedUrl.id ? updatedUrl : item
+          )
+        );
       }
-      
+
       setShowExpirationModal(false);
       setSelectedUrl(null);
     } catch (err) {
       console.error('Error updating URL expiration:', err);
       setExpirationErrors({
-        submit: err.response?.data?.expiration_date?.[0] || 
-                err.response?.data?.expiration_days?.[0] || 
-                'Failed to update expiration. Please try again.'
+        submit: err.response?.data?.expiration_date?.[0] ||
+          err.response?.data?.expiration_days?.[0] ||
+          'Failed to update expiration. Please try again.'
       });
     } finally {
       setExpirationUpdating(false);
     }
   };
-  
+
   // Add a new handler for QR code generation
   const handleShowQRCode = (url) => {
     setSelectedUrl(url);
     setShowQRCodeModal(true);
   };
-  
+
   const handleCloneClick = (url) => {
     setSelectedUrl(url);
-    
+
     // Pre-fill the clone form with data from the original URL
     setCloneData({
       title: `Clone of ${url.title || url.short_code}`,
@@ -734,42 +734,42 @@ const DashboardPage = () => {
       enable_ip_restrictions: url.enable_ip_restrictions || false,
       spoofing_protection: url.spoofing_protection || false
     });
-    
+
     setShowCloneModal(true);
   };
-  
+
   const handleCloneFormChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     setCloneData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
   };
-  
+
   const handleSubmitClone = async (e) => {
     e.preventDefault();
-    
+
     if (!selectedUrl) return;
-    
+
     setCloneLoading(true);
-    
+
     try {
       // Convert tag_ids to integers if they're strings
       const formattedData = {
         ...cloneData,
         tag_ids: cloneData.tag_ids.map(id => typeof id === 'string' ? parseInt(id, 10) : id)
       };
-      
+
       // Clone the URL
       const clonedUrl = await urlService.cloneUrl(selectedUrl.id, formattedData);
-      
+
       // Add the cloned URL to the list
       setUrls(prevUrls => [clonedUrl, ...prevUrls]);
-      
+
       // Close the modal
       setShowCloneModal(false);
-      
+
       // Show success message
       toast.success('URL cloned successfully!');
     } catch (error) {
@@ -779,20 +779,20 @@ const DashboardPage = () => {
       setCloneLoading(false);
     }
   };
-  
+
   // Helper function to format date for input fields
   const formatDateForInput = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toISOString().split('T')[0];
   };
-  
+
   // Add a function to update the URL preview
   const handleUpdatePreview = async (url) => {
     if (!url || !url.id) return;
-    
+
     setUpdatingPreview(true);
-    
+
     try {
       const result = await urlService.updatePreview(url.id);
       if (result && result.success) {
@@ -805,12 +805,12 @@ const DashboardPage = () => {
           preview_image: result.preview.image,
           preview_updated_at: result.preview.updated_at
         };
-        
+
         setSelectedUrl(updatedUrl);
-        
+
         // Also update the URL in the list
         setUrls(prevUrls => prevUrls.map(u => u.id === url.id ? updatedUrl : u));
-        
+
         toast.success('Preview updated successfully');
       }
     } catch (err) {
@@ -820,7 +820,7 @@ const DashboardPage = () => {
       setUpdatingPreview(false);
     }
   };
-  
+
   // Add handler for favorite toggle
   const handleToggleFavorite = async (urlId, isFavorite) => {
     try {
@@ -835,7 +835,7 @@ const DashboardPage = () => {
       toast.error('Failed to update favorite status');
     }
   };
-  
+
   // Add handler for malware status change
   const handleMalwareStatusChange = async (urlId, status) => {
     try {
@@ -850,7 +850,7 @@ const DashboardPage = () => {
       toast.error('Failed to update malware status');
     }
   };
-  
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
@@ -858,7 +858,7 @@ const DashboardPage = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="bg-gray-50 min-h-[calc(100vh-4rem)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -892,9 +892,9 @@ const DashboardPage = () => {
               </button>
             </div>
           </motion.div>
-          
+
           {error && (
-            <motion.div 
+            <motion.div
               variants={itemVariants}
               className="bg-red-50 text-red-700 p-4 rounded-lg flex items-start"
             >
@@ -902,11 +902,11 @@ const DashboardPage = () => {
               <span>{error}</span>
             </motion.div>
           )}
-          
+
           <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-soft p-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 space-y-4 md:space-y-0">
               <h2 className="text-xl font-display font-semibold text-dark-900">Your URLs</h2>
-              
+
               <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 w-full md:w-auto">
                 {/* Filter controls */}
                 <div className="relative">
@@ -920,7 +920,7 @@ const DashboardPage = () => {
                     <option value="inactive">Inactive/Expired</option>
                   </select>
                 </div>
-                
+
                 {/* Sort controls */}
                 <div className="relative">
                   <select
@@ -940,7 +940,7 @@ const DashboardPage = () => {
                     <option value="short_code-desc">Code (Z-A)</option>
                   </select>
                 </div>
-                
+
                 {/* Search box */}
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -954,7 +954,7 @@ const DashboardPage = () => {
                     className="input pl-10"
                   />
                 </div>
-                
+
                 {/* Favorites toggle button */}
                 <button
                   onClick={() => {
@@ -966,7 +966,7 @@ const DashboardPage = () => {
                   <FiStar className="mr-1" />
                   <span>Favorites</span>
                 </button>
-                
+
                 {/* Filter button */}
                 <button
                   onClick={() => setActiveFilters(!activeFilters)}
@@ -982,7 +982,7 @@ const DashboardPage = () => {
                 </button>
               </div>
             </div>
-            
+
             {/* Advanced filters section */}
             <AnimatePresence>
               {activeFilters && (
@@ -999,7 +999,7 @@ const DashboardPage = () => {
                         <label className="block text-sm font-medium text-dark-700">
                           <FiTag className="inline mr-1" /> Filter by Tags
                         </label>
-                        <button 
+                        <button
                           type="button"
                           onClick={() => setShowTagManagementModal(true)}
                           className="text-xs text-primary-600 hover:text-primary-700 flex items-center"
@@ -1007,21 +1007,21 @@ const DashboardPage = () => {
                           <FiSettings className="mr-1 h-3 w-3" /> Manage Tags
                         </button>
                       </div>
-                      <TagSelector 
-                        selectedTags={filterTags} 
-                        onChange={setFilterTags} 
+                      <TagSelector
+                        selectedTags={filterTags}
+                        onChange={setFilterTags}
                         allowCreate={false}
                         allowEdit={false}
                       />
                     </div>
-                    
+
                     {/* Folder filter */}
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <label className="block text-sm font-medium text-dark-700">
                           <FiFolder className="inline mr-1" /> Filter by Folder
                         </label>
-                        <button 
+                        <button
                           type="button"
                           onClick={() => setShowFolderManagementModal(true)}
                           className="text-xs text-primary-600 hover:text-primary-700 flex items-center"
@@ -1029,13 +1029,13 @@ const DashboardPage = () => {
                           <FiSettings className="mr-1 h-3 w-3" /> Manage Folders
                         </button>
                       </div>
-                      <FolderSelector 
-                        selectedFolder={filterFolder} 
-                        onChange={setFilterFolder} 
+                      <FolderSelector
+                        selectedFolder={filterFolder}
+                        onChange={setFilterFolder}
                       />
                     </div>
                   </div>
-                  
+
                   <div className="flex justify-end mt-4 space-x-3">
                     <button
                       onClick={() => {
@@ -1061,7 +1061,7 @@ const DashboardPage = () => {
                 </motion.div>
               )}
             </AnimatePresence>
-            
+
             {urls.length === 0 ? (
               <div className="text-center py-10">
                 <FiLink className="mx-auto h-12 w-12 text-dark-300" />
@@ -1139,10 +1139,10 @@ const DashboardPage = () => {
                             >
                               {copied === url.id ? <FiCheckCircle className="text-accent-500" /> : <FiCopy />}
                             </button>
-                            <FavoriteButton 
-                              urlId={url.id} 
-                              isFavorite={url.is_favorite} 
-                              onToggle={handleToggleFavorite} 
+                            <FavoriteButton
+                              urlId={url.id}
+                              isFavorite={url.is_favorite}
+                              onToggle={handleToggleFavorite}
                             />
                           </div>
                         </td>
@@ -1199,16 +1199,16 @@ const DashboardPage = () => {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-dark-500">
-                          <MalwareStatusIndicator 
-                            urlId={url.id} 
-                            malwareStatus={url.malware_status} 
-                            onStatusChange={handleMalwareStatusChange} 
+                          <MalwareStatusIndicator
+                            urlId={url.id}
+                            malwareStatus={url.malware_status}
+                            onStatusChange={handleMalwareStatusChange}
                           />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {url.expires_at ? (
                             <div className={`flex items-center text-sm ${isExpired(url) ? 'text-red-500' : 'text-dark-500'}`}>
-                              <FiClock className="mr-1 h-4 w-4" /> 
+                              <FiClock className="mr-1 h-4 w-4" />
                               <span>{formatDate(url.expires_at)}</span>
                               <button
                                 onClick={() => handleExpirationClick(url)}
@@ -1295,7 +1295,7 @@ const DashboardPage = () => {
           </motion.div>
         </motion.div>
       </div>
-      
+
       {/* Create URL Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-dark-900 bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
@@ -1313,7 +1313,7 @@ const DashboardPage = () => {
                 <FiX className="h-5 w-5" />
               </button>
             </div>
-            
+
             {createSuccess ? (
               <div className="bg-accent-50 text-accent-800 p-4 rounded-lg mb-4 flex items-center">
                 <FiCheckCircle className="mr-2 text-accent-600" />
@@ -1327,7 +1327,7 @@ const DashboardPage = () => {
                     <span>{formErrors.submit}</span>
                   </div>
                 )}
-                
+
                 <div>
                   <label htmlFor="original_url" className="label">URL to Shorten *</label>
                   <input
@@ -1343,7 +1343,7 @@ const DashboardPage = () => {
                     <p className="mt-1 text-sm text-red-600">{formErrors.original_url}</p>
                   )}
                 </div>
-                
+
                 <div>
                   <label htmlFor="custom_code" className="label">Custom Code (Optional)</label>
                   <input
@@ -1359,7 +1359,7 @@ const DashboardPage = () => {
                     Leave blank to generate a random code.
                   </p>
                 </div>
-                
+
                 <div>
                   <label htmlFor="title" className="label">Title (Optional)</label>
                   <input
@@ -1372,7 +1372,7 @@ const DashboardPage = () => {
                     placeholder="My awesome link"
                   />
                 </div>
-                
+
                 <div>
                   <label htmlFor="expiration_days" className="label">Expires After (Optional)</label>
                   <select
@@ -1390,7 +1390,7 @@ const DashboardPage = () => {
                     <option value="365">1 year</option>
                   </select>
                 </div>
-                
+
                 <div className="flex items-center">
                   <input
                     id="is_active"
@@ -1404,7 +1404,7 @@ const DashboardPage = () => {
                     Active (URL is immediately accessible)
                   </label>
                 </div>
-                
+
                 <div className="flex items-center">
                   <input
                     id="is_ab_test"
@@ -1418,7 +1418,7 @@ const DashboardPage = () => {
                     Enable A/B Testing
                   </label>
                 </div>
-                
+
                 {/* A/B Testing Form */}
                 <AnimatePresence>
                   {newUrl.is_ab_test && (
@@ -1434,23 +1434,23 @@ const DashboardPage = () => {
                           <FiAlertCircle className="inline mr-1" /> {formErrors.variants}
                         </div>
                       )}
-                      <ABTestingForm 
-                        variants={newUrl.variants} 
+                      <ABTestingForm
+                        variants={newUrl.variants}
                         setVariants={(updatedVariants) => {
                           setNewUrl(prev => ({
                             ...prev,
                             variants: updatedVariants
                           }));
-                        }} 
+                        }}
                       />
                     </motion.div>
                   )}
                 </AnimatePresence>
-                
+
                 {/* Organization section */}
                 <div className="mt-4 pt-3 border-t border-gray-200">
                   <h3 className="text-md font-medium text-dark-800 mb-3">Organization</h3>
-                  
+
                   <div className="space-y-3">
                     {/* Folder selection */}
                     <div>
@@ -1458,7 +1458,7 @@ const DashboardPage = () => {
                         <label className="block text-xs font-medium text-dark-700">
                           <FiFolder className="inline mr-1" /> Folder (Optional)
                         </label>
-                        <button 
+                        <button
                           type="button"
                           onClick={() => {
                             // Save current form state and open folder management modal
@@ -1474,14 +1474,14 @@ const DashboardPage = () => {
                         onChange={(folder) => setNewUrl(prev => ({ ...prev, folder }))}
                       />
                     </div>
-                    
+
                     {/* Tags selection */}
                     <div>
                       <div className="flex justify-between items-center mb-1">
                         <label className="block text-xs font-medium text-dark-700">
                           <FiTag className="inline mr-1" /> Tags (Optional)
                         </label>
-                        <button 
+                        <button
                           type="button"
                           onClick={() => {
                             // Save current form state and open tag management modal
@@ -1499,16 +1499,16 @@ const DashboardPage = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Advanced options */}
-                <AdvancedOptionsForm 
-                  formData={newUrl} 
+                <AdvancedOptionsForm
+                  formData={newUrl}
                   setFormData={(updatedData) => {
                     console.log('Updating form data from AdvancedOptionsForm:', updatedData);
                     setNewUrl(updatedData);
-                  }} 
+                  }}
                 />
-                
+
                 <div className="flex justify-end space-x-3 pt-4 mt-4 border-t border-gray-100">
                   <button
                     type="button"
@@ -1541,7 +1541,7 @@ const DashboardPage = () => {
           </motion.div>
         </div>
       )}
-      
+
       {/* Delete Confirmation Modal */}
       {showDeleteModal && selectedUrl && (
         <div className="fixed inset-0 bg-dark-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -1556,7 +1556,7 @@ const DashboardPage = () => {
                 {selectedUrl.full_short_url ? selectedUrl.full_short_url.split('/').pop() : selectedUrl.short_code}
               </span>? This action cannot be undone.
             </p>
-            
+
             <div className="flex justify-end space-x-3">
               <button
                 onClick={() => {
@@ -1577,16 +1577,16 @@ const DashboardPage = () => {
           </motion.div>
         </div>
       )}
-      
+
       {/* URL Details Modal */}
       {showDetailsModal && selectedUrl && (
         <div className="fixed inset-0 bg-dark-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-xl shadow-soft p-6 max-w-2xl w-full"
+            className="bg-white rounded-xl shadow-soft max-w-2xl w-full max-h-[90vh] flex flex-col"
           >
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center p-6 pb-4 border-b border-gray-200 flex-shrink-0">
               <h2 className="text-xl font-display font-semibold text-dark-900">URL Details</h2>
               <button
                 onClick={() => {
@@ -1598,200 +1598,205 @@ const DashboardPage = () => {
                 <FiX className="h-5 w-5" />
               </button>
             </div>
-            
-            <div className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <div className="flex-1 overflow-y-auto p-6 pt-4">
+              <div className="space-y-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-dark-500 mb-1">Short URL</p>
+                      <div className="flex items-center">
+                        <p className="font-medium text-primary-600 mr-2">
+                          {selectedUrl.full_short_url || `${window.location.origin}/s/${selectedUrl.short_code}`}
+                        </p>
+                        <button
+                          onClick={() => handleCopy(selectedUrl)}
+                          className="text-dark-400 hover:text-dark-600"
+                          title="Copy to clipboard"
+                        >
+                          {copied === selectedUrl.id ? <FiCheckCircle className="text-accent-500" /> : <FiCopy />}
+                        </button>
+                        <FavoriteButton
+                          urlId={selectedUrl.id}
+                          isFavorite={selectedUrl.is_favorite}
+                          onToggle={handleToggleFavorite}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-dark-500 mb-1">Status</p>
+                      <div className="flex items-center">
+                        <span className={`inline-flex rounded-full h-3 w-3 bg-${getStatusColor(selectedUrl)} mr-2`}></span>
+                        <span className="font-medium">{getStatusLabel(selectedUrl)}</span>
+                        <button
+                          onClick={() => {
+                            handleToggleStatus(selectedUrl);
+                            setShowDetailsModal(false);
+                          }}
+                          className="ml-2 text-primary-600 hover:text-primary-700 text-sm"
+                        >
+                          {selectedUrl.is_active ? 'Deactivate' : 'Activate'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm text-dark-500 mb-1">Original URL</p>
+                  <p className="break-all">
+                    <a href={selectedUrl.original_url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+                      {selectedUrl.original_url}
+                    </a>
+                  </p>
+                </div>
+
+                {selectedUrl.title && (
                   <div>
-                    <p className="text-sm text-dark-500 mb-1">Short URL</p>
-                    <div className="flex items-center">
-                      <p className="font-medium text-primary-600 mr-2">
-                        {selectedUrl.full_short_url || `${window.location.origin}/s/${selectedUrl.short_code}`}
-                      </p>
-                      <button
-                        onClick={() => handleCopy(selectedUrl)}
-                        className="text-dark-400 hover:text-dark-600"
-                        title="Copy to clipboard"
-                      >
-                        {copied === selectedUrl.id ? <FiCheckCircle className="text-accent-500" /> : <FiCopy />}
-                      </button>
-                      <FavoriteButton 
-                        urlId={selectedUrl.id} 
-                        isFavorite={selectedUrl.is_favorite} 
-                        onToggle={handleToggleFavorite} 
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm text-dark-500 mb-1">Status</p>
-                    <div className="flex items-center">
-                      <span className={`inline-flex rounded-full h-3 w-3 bg-${getStatusColor(selectedUrl)} mr-2`}></span>
-                      <span className="font-medium">{getStatusLabel(selectedUrl)}</span>
-                      <button
-                        onClick={() => {
-                          handleToggleStatus(selectedUrl);
-                          setShowDetailsModal(false);
-                        }}
-                        className="ml-2 text-primary-600 hover:text-primary-700 text-sm"
-                      >
-                        {selectedUrl.is_active ? 'Deactivate' : 'Activate'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <p className="text-sm text-dark-500 mb-1">Original URL</p>
-                <p className="break-all">
-                  <a href={selectedUrl.original_url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
-                    {selectedUrl.original_url}
-                  </a>
-                </p>
-              </div>
-              
-              {selectedUrl.title && (
-                <div>
-                  <p className="text-sm text-dark-500 mb-1">Title</p>
-                  <p className="font-medium">{selectedUrl.title}</p>
-                </div>
-              )}
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-dark-500 mb-1">Created</p>
-                  <p>{formatDateTime(selectedUrl.created_at)}</p>
-                </div>
-                
-                <div>
-                  <p className="text-sm text-dark-500 mb-1">Expiration</p>
-                  <div className="flex items-center">
-                    {selectedUrl.expires_at ? (
-                      <span className={isExpired(selectedUrl) ? 'text-red-500' : ''}>
-                        {formatDateTime(selectedUrl.expires_at)}
-                      </span>
-                    ) : (
-                      <span>Never expires</span>
-                    )}
-                    <button
-                      onClick={() => {
-                        setShowDetailsModal(false);
-                        handleExpirationClick(selectedUrl);
-                      }}
-                      className="ml-2 text-primary-600 hover:text-primary-700"
-                      title="Change expiration"
-                    >
-                      <FiEdit className="h-3 w-3" />
-                    </button>
-                  </div>
-                </div>
-                
-                <div>
-                  <p className="text-sm text-dark-500 mb-1">Last Accessed</p>
-                  <p>{selectedUrl.last_accessed ? formatDateTime(selectedUrl.last_accessed) : 'Never'}</p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div>
-                  <p className="text-sm text-dark-500 mb-1">Folder</p>
-                  {selectedUrl.folder ? (
-                    <div className="flex items-center">
-                      <FiFolder className="mr-1 text-gray-500" />
-                      <span className="bg-gray-100 px-2 py-0.5 rounded-md text-sm">{selectedUrl.folder}</span>
-                    </div>
-                  ) : (
-                    <span className="text-gray-400">Not in a folder</span>
-                  )}
-                </div>
-                
-                <div>
-                  <p className="text-sm text-dark-500 mb-1">Tags</p>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedUrl.tags && selectedUrl.tags.length > 0 ? (
-                      selectedUrl.tags.map(tag => (
-                        <TagBadge key={tag.id} tag={tag} size="sm" />
-                      ))
-                    ) : (
-                      <span className="text-gray-400">No tags</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <p className="text-sm text-dark-500 mb-1">Total Clicks</p>
-                <p className="text-2xl font-display font-bold text-primary-600">{selectedUrl.access_count}</p>
-              </div>
-              
-              {/* Malware detection status */}
-              <div className="border-t border-gray-200 pt-4">
-                <p className="text-sm text-dark-500 mb-2">Security Status</p>
-                <MalwareStatusIndicator 
-                  urlId={selectedUrl.id} 
-                  malwareStatus={selectedUrl.malware_status} 
-                  onStatusChange={handleMalwareStatusChange} 
-                />
-              </div>
-              
-              {/* Preview section */}
-              <div className="border-t border-gray-200 pt-4">
-                <div className="flex justify-between items-center mb-2">
-                  <p className="text-sm text-dark-500">URL Preview</p>
-                  <button
-                    onClick={() => handleUpdatePreview(selectedUrl)}
-                    disabled={updatingPreview}
-                    className="btn btn-sm btn-outline flex items-center"
-                  >
-                    <FiEye className="mr-1" />
-                    {updatingPreview ? 'Updating...' : 'Update Preview'}
-                  </button>
-                </div>
-                
-                {selectedUrl.enable_preview && (selectedUrl.preview_image || selectedUrl.preview_title || selectedUrl.preview_description) ? (
-                  <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
-                    {selectedUrl.preview_image && (
-                      <img
-                        src={selectedUrl.preview_image}
-                        alt={selectedUrl.preview_title || "Preview"}
-                        className="w-full h-32 object-cover"
-                      />
-                    )}
-                    
-                    <div className="p-3">
-                      {selectedUrl.preview_title && (
-                        <p className="font-medium text-dark-900 mb-1">
-                          {selectedUrl.preview_title}
-                        </p>
-                      )}
-                      
-                      {selectedUrl.preview_description && (
-                        <p className="text-sm text-dark-600 line-clamp-2">
-                          {selectedUrl.preview_description}
-                        </p>
-                      )}
-                      
-                      {selectedUrl.preview_updated_at && (
-                        <p className="text-xs text-dark-400 mt-1">
-                          Updated: {formatDateTime(selectedUrl.preview_updated_at)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-gray-50 p-3 rounded-lg text-center">
-                    <p className="text-sm text-dark-500">No preview available</p>
-                    {selectedUrl.one_time_use && (
-                      <p className="text-xs text-amber-600 mt-1">
-                        Note: One-time use links will expire after first click
-                      </p>
-                    )}
+                    <p className="text-sm text-dark-500 mb-1">Title</p>
+                    <p className="font-medium">{selectedUrl.title}</p>
                   </div>
                 )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm text-dark-500 mb-1">Created</p>
+                    <p>{formatDateTime(selectedUrl.created_at)}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-dark-500 mb-1">Expiration</p>
+                    <div className="flex items-center">
+                      {selectedUrl.expires_at ? (
+                        <span className={isExpired(selectedUrl) ? 'text-red-500' : ''}>
+                          {formatDateTime(selectedUrl.expires_at)}
+                        </span>
+                      ) : (
+                        <span>Never expires</span>
+                      )}
+                      <button
+                        onClick={() => {
+                          setShowDetailsModal(false);
+                          handleExpirationClick(selectedUrl);
+                        }}
+                        className="ml-2 text-primary-600 hover:text-primary-700"
+                        title="Change expiration"
+                      >
+                        <FiEdit className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-dark-500 mb-1">Last Accessed</p>
+                    <p>{selectedUrl.last_accessed ? formatDateTime(selectedUrl.last_accessed) : 'Never'}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <p className="text-sm text-dark-500 mb-1">Folder</p>
+                    {selectedUrl.folder ? (
+                      <div className="flex items-center">
+                        <FiFolder className="mr-1 text-gray-500" />
+                        <span className="bg-gray-100 px-2 py-0.5 rounded-md text-sm">{selectedUrl.folder}</span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">Not in a folder</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-dark-500 mb-1">Tags</p>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedUrl.tags && selectedUrl.tags.length > 0 ? (
+                        selectedUrl.tags.map(tag => (
+                          <TagBadge key={tag.id} tag={tag} size="sm" />
+                        ))
+                      ) : (
+                        <span className="text-gray-400">No tags</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm text-dark-500 mb-1">Total Clicks</p>
+                  <p className="text-2xl font-display font-bold text-primary-600">{selectedUrl.access_count}</p>
+                </div>
+
+                {/* Malware detection status */}
+                <div className="border-t border-gray-200 pt-4">
+                  <p className="text-sm text-dark-500 mb-2">Security Status</p>
+                  <MalwareStatusIndicator
+                    urlId={selectedUrl.id}
+                    malwareStatus={selectedUrl.malware_status}
+                    onStatusChange={handleMalwareStatusChange}
+                  />
+                </div>
+
+                {/* Preview section */}
+                <div className="border-t border-gray-200 pt-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-sm text-dark-500">URL Preview</p>
+                    <button
+                      onClick={() => handleUpdatePreview(selectedUrl)}
+                      disabled={updatingPreview}
+                      className="btn btn-sm btn-outline flex items-center"
+                    >
+                      <FiEye className="mr-1" />
+                      {updatingPreview ? 'Updating...' : 'Update Preview'}
+                    </button>
+                  </div>
+
+                  {selectedUrl.enable_preview && (selectedUrl.preview_image || selectedUrl.preview_title || selectedUrl.preview_description) ? (
+                    <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
+                      {selectedUrl.preview_image && (
+                        <img
+                          src={selectedUrl.preview_image}
+                          alt={selectedUrl.preview_title || "Preview"}
+                          className="w-full h-32 object-cover"
+                        />
+                      )}
+
+                      <div className="p-3">
+                        {selectedUrl.preview_title && (
+                          <p className="font-medium text-dark-900 mb-1">
+                            {selectedUrl.preview_title}
+                          </p>
+                        )}
+
+                        {selectedUrl.preview_description && (
+                          <p className="text-sm text-dark-600 line-clamp-2">
+                            {selectedUrl.preview_description}
+                          </p>
+                        )}
+
+                        {selectedUrl.preview_updated_at && (
+                          <p className="text-xs text-dark-400 mt-1">
+                            Updated: {formatDateTime(selectedUrl.preview_updated_at)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 p-3 rounded-lg text-center">
+                      <p className="text-sm text-dark-500">No preview available</p>
+                      {selectedUrl.one_time_use && (
+                        <p className="text-xs text-amber-600 mt-1">
+                          Note: One-time use links will expire after first click
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
               </div>
-              
-              <div className="pt-4 flex justify-between border-t border-gray-200">
+            </div>
+
+            <div className="p-6 pt-4 border-t border-gray-200 flex-shrink-0">
+              <div className="flex justify-between">
                 <div>
                   <Link
                     to={`/analytics/${selectedUrl.id}`}
@@ -1800,7 +1805,7 @@ const DashboardPage = () => {
                     <FiBarChart2 className="mr-2" /> View Analytics
                   </Link>
                 </div>
-                
+
                 <div className="flex space-x-3">
                   <button
                     onClick={() => {
@@ -1835,7 +1840,7 @@ const DashboardPage = () => {
           </motion.div>
         </div>
       )}
-      
+
       {/* Expiration Modal */}
       {showExpirationModal && selectedUrl && (
         <div className="fixed inset-0 bg-dark-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -1856,20 +1861,20 @@ const DashboardPage = () => {
                 <FiX className="h-5 w-5" />
               </button>
             </div>
-            
+
             <div className="mb-4">
               <p className="text-dark-500">
                 Set when this URL should expire. After expiration, the URL will no longer redirect to the original destination.
               </p>
             </div>
-            
+
             {expirationErrors.submit && (
               <div className="bg-red-50 text-red-700 p-3 rounded-lg flex items-start mb-4">
                 <FiAlertCircle className="mr-2 mt-0.5 flex-shrink-0" />
                 <span>{expirationErrors.submit}</span>
               </div>
             )}
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-dark-700 mb-1">
@@ -1886,7 +1891,7 @@ const DashboardPage = () => {
                   <option value="date">Expire on specific date</option>
                 </select>
               </div>
-              
+
               {expirationForm.expirationType === 'days' && (
                 <div>
                   <label className="block text-sm font-medium text-dark-700 mb-1">
@@ -1910,7 +1915,7 @@ const DashboardPage = () => {
                   )}
                 </div>
               )}
-              
+
               {expirationForm.expirationType === 'date' && (
                 <div>
                   <label className="block text-sm font-medium text-dark-700 mb-1">
@@ -1935,7 +1940,7 @@ const DashboardPage = () => {
                   </p>
                 </div>
               )}
-              
+
               <div className="pt-4 flex justify-end space-x-3">
                 <button
                   onClick={() => {
@@ -1968,35 +1973,35 @@ const DashboardPage = () => {
           </motion.div>
         </div>
       )}
-      
+
       {/* QR Code Modal */}
       <AnimatePresence>
         {showQRCodeModal && selectedUrl && (
-          <QRCodeModal 
-            url={selectedUrl} 
-            onClose={() => setShowQRCodeModal(false)} 
+          <QRCodeModal
+            url={selectedUrl}
+            onClose={() => setShowQRCodeModal(false)}
           />
         )}
       </AnimatePresence>
-      
+
       {/* Tag Management Modal */}
-      <TagManagementModal 
-        isOpen={showTagManagementModal} 
+      <TagManagementModal
+        isOpen={showTagManagementModal}
         onClose={() => {
           setShowTagManagementModal(false);
           fetchUrls(); // Refresh data after managing tags
         }}
       />
-      
+
       {/* Folder Management Modal */}
-      <FolderManagementModal 
-        isOpen={showFolderManagementModal} 
+      <FolderManagementModal
+        isOpen={showFolderManagementModal}
         onClose={() => {
           setShowFolderManagementModal(false);
           fetchUrls(); // Refresh data after managing folders
         }}
       />
-      
+
       {/* Clone URL Modal */}
       {showCloneModal && selectedUrl && (
         <div className="fixed inset-0 bg-dark-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -2014,7 +2019,7 @@ const DashboardPage = () => {
                 <FiX className="h-5 w-5" />
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmitClone} className="space-y-4">
               <div>
                 <label htmlFor="title" className="label">Title</label>
@@ -2028,7 +2033,7 @@ const DashboardPage = () => {
                   placeholder="Enter a title for the cloned URL"
                 />
               </div>
-              
+
               <div>
                 <label htmlFor="original_url" className="label">Original URL</label>
                 <input
@@ -2041,7 +2046,7 @@ const DashboardPage = () => {
                   placeholder="Enter the original URL"
                 />
               </div>
-              
+
               <div>
                 <label htmlFor="folder" className="label">Folder</label>
                 <FolderSelector
@@ -2049,7 +2054,7 @@ const DashboardPage = () => {
                   onChange={(folder) => setCloneData(prev => ({ ...prev, folder }))}
                 />
               </div>
-              
+
               <div>
                 <label className="label">Expiration</label>
                 <div className="space-y-2">
@@ -2065,7 +2070,7 @@ const DashboardPage = () => {
                     />
                     <label htmlFor="clone-expiration-none">No expiration</label>
                   </div>
-                  
+
                   <div className="flex items-center">
                     <input
                       type="radio"
@@ -2089,7 +2094,7 @@ const DashboardPage = () => {
                       />
                     )}
                   </div>
-                  
+
                   <div className="flex items-center">
                     <input
                       type="radio"
@@ -2114,11 +2119,11 @@ const DashboardPage = () => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Security Features */}
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="font-medium mb-3 text-dark-900">Security Features</h3>
-                
+
                 <div className="space-y-3">
                   <div className="flex items-center">
                     <input
@@ -2134,7 +2139,7 @@ const DashboardPage = () => {
                       <span className="block text-dark-500 text-xs">Verify link integrity using cryptographic hashes</span>
                     </label>
                   </div>
-                  
+
                   <div className="flex items-center">
                     <input
                       type="checkbox"
@@ -2151,7 +2156,7 @@ const DashboardPage = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div>
                 <label htmlFor="tag_ids" className="label">Tags</label>
                 <TagSelector
@@ -2159,7 +2164,7 @@ const DashboardPage = () => {
                   onChange={(tags) => setCloneData(prev => ({ ...prev, tag_ids: tags.map(tag => tag.id) }))}
                 />
               </div>
-              
+
               <div className="pt-4 flex justify-end space-x-3">
                 <button
                   type="button"

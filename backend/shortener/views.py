@@ -762,18 +762,17 @@ def redirect_to_original(request, short_code):
             'message': 'An error occurred while processing your request.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(['GET'])
-@permission_classes([permissions.AllowAny])
 def generate_qr_code(request, short_code):
     """Generate a QR code for a shortened URL."""
     url = get_object_or_404(ShortenedURL, short_code=short_code)
     
     # Check if URL is active and not expired
     if not url.is_active or url.is_expired():
-        return Response({
+        from django.http import JsonResponse
+        return JsonResponse({
             'error': 'Cannot generate QR code for inactive or expired URL.',
             'status': 'error'
-        }, status=status.HTTP_400_BAD_REQUEST)
+        }, status=400)
     
     # Generate the full URL for QR code
     full_url = f"{settings.URL_SHORTENER_DOMAIN}/s/{short_code}"
@@ -791,14 +790,16 @@ def generate_qr_code(request, short_code):
     img = qr.make_image(fill_color="black", back_color="white")
     
     # Format requested by the client
-    format_param = request.query_params.get('format', 'png')
+    format_param = request.GET.get('format', 'png')
     
     if format_param == 'base64':
         # Return base64 encoded image for embedding in HTML
         buffer = io.BytesIO()
         img.save(buffer, format='PNG')
         encoded_img = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        return Response({
+        
+        from django.http import JsonResponse
+        return JsonResponse({
             'qr_code': f"data:image/png;base64,{encoded_img}",
             'url': full_url
         })
