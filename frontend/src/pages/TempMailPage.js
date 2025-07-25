@@ -8,6 +8,75 @@ import {
 import { toast } from 'react-hot-toast';
 import tempmailService from '../services/tempmailService';
 
+// Helper function to sanitize and style HTML content
+const sanitizeAndStyleHtml = (html) => {
+  if (!html) return '';
+  
+  // Basic HTML sanitization and styling
+  let sanitized = html
+    // Ensure links open in new tab and are styled
+    .replace(/<a\s+([^>]*?)href=["']([^"']*?)["']([^>]*?)>/gi, 
+      '<a $1href="$2"$3 target="_blank" rel="noopener noreferrer" style="color: #3b82f6; text-decoration: underline;">')
+    // Style common elements
+    .replace(/<p\s*([^>]*)>/gi, '<p $1 style="margin: 0.5em 0; line-height: 1.6;">')
+    .replace(/<div\s*([^>]*)>/gi, '<div $1 style="margin: 0.25em 0;">')
+    .replace(/<h1\s*([^>]*)>/gi, '<h1 $1 style="font-size: 1.5em; font-weight: bold; margin: 1em 0 0.5em 0; color: #1f2937;">')
+    .replace(/<h2\s*([^>]*)>/gi, '<h2 $1 style="font-size: 1.3em; font-weight: bold; margin: 0.8em 0 0.4em 0; color: #1f2937;">')
+    .replace(/<h3\s*([^>]*)>/gi, '<h3 $1 style="font-size: 1.1em; font-weight: bold; margin: 0.6em 0 0.3em 0; color: #1f2937;">')
+    .replace(/<strong\s*([^>]*)>/gi, '<strong $1 style="font-weight: 600; color: #1f2937;">')
+    .replace(/<b\s*([^>]*)>/gi, '<b $1 style="font-weight: 600; color: #1f2937;">')
+    .replace(/<em\s*([^>]*)>/gi, '<em $1 style="font-style: italic; color: #4b5563;">')
+    .replace(/<i\s*([^>]*)>/gi, '<i $1 style="font-style: italic; color: #4b5563;">')
+    // Style tables
+    .replace(/<table\s*([^>]*)>/gi, '<table $1 style="border-collapse: collapse; width: 100%; margin: 1em 0;">')
+    .replace(/<td\s*([^>]*)>/gi, '<td $1 style="padding: 0.5em; border: 1px solid #e5e7eb;">')
+    .replace(/<th\s*([^>]*)>/gi, '<th $1 style="padding: 0.5em; border: 1px solid #e5e7eb; background-color: #f9fafb; font-weight: 600;">')
+    // Style lists
+    .replace(/<ul\s*([^>]*)>/gi, '<ul $1 style="margin: 0.5em 0; padding-left: 1.5em;">')
+    .replace(/<ol\s*([^>]*)>/gi, '<ol $1 style="margin: 0.5em 0; padding-left: 1.5em;">')
+    .replace(/<li\s*([^>]*)>/gi, '<li $1 style="margin: 0.25em 0;">')
+    // Style blockquotes
+    .replace(/<blockquote\s*([^>]*)>/gi, '<blockquote $1 style="border-left: 4px solid #e5e7eb; padding-left: 1em; margin: 1em 0; color: #6b7280; font-style: italic;">')
+    // Remove potentially dangerous elements while keeping content
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '') // Remove event handlers
+    .replace(/javascript:/gi, ''); // Remove javascript: links
+  
+  return sanitized;
+};
+
+// Helper function to linkify plain text
+const linkifyText = (text) => {
+  if (!text) return '';
+  
+  // URL regex pattern
+  const urlRegex = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/gi;
+  const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi;
+  
+  // Split text by lines to preserve formatting
+  const lines = text.split('\n');
+  
+  return lines.map((line, lineIndex) => {
+    // Replace URLs with clickable links
+    let processedLine = line.replace(urlRegex, (url) => {
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #3b82f6; text-decoration: underline;">${url}</a>`;
+    });
+    
+    // Replace email addresses with mailto links
+    processedLine = processedLine.replace(emailRegex, (email) => {
+      return `<a href="mailto:${email}" style="color: #3b82f6; text-decoration: underline;">${email}</a>`;
+    });
+    
+    return (
+      <span key={lineIndex}>
+        <span dangerouslySetInnerHTML={{ __html: processedLine }} />
+        {lineIndex < lines.length - 1 && <br />}
+      </span>
+    );
+  });
+};
+
 const TempMailPage = () => {
     const [session, setSession] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -614,16 +683,20 @@ const TempMailPage = () => {
                                 )}
 
                                 {/* Message Body */}
-                                <div className="prose max-w-none">
+                                <div className="prose prose-sm max-w-none">
                                     {selectedMessage.body_html ? (
                                         <div
-                                            dangerouslySetInnerHTML={{ __html: selectedMessage.body_html }}
-                                            className="text-dark-900"
+                                            dangerouslySetInnerHTML={{ __html: sanitizeAndStyleHtml(selectedMessage.body_html) }}
+                                            className="email-content text-dark-900"
+                                            style={{
+                                                lineHeight: '1.6',
+                                                fontSize: '14px'
+                                            }}
                                         />
                                     ) : (
-                                        <pre className="whitespace-pre-wrap text-dark-900 font-sans">
-                                            {selectedMessage.body_text || 'No content'}
-                                        </pre>
+                                        <div className="whitespace-pre-wrap text-dark-900 font-sans leading-relaxed">
+                                            {linkifyText(selectedMessage.body_text || 'No content')}
+                                        </div>
                                     )}
                                 </div>
                             </div>
