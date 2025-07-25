@@ -13,7 +13,7 @@ from analytics.models import ClickEvent, UserSession
 from django.http import HttpResponseRedirect, HttpResponse
 from django.utils import timezone
 from user_agents import parse
-import ipware.ip
+from ipware import get_client_ip
 import qrcode
 import io
 from django.conf import settings
@@ -399,14 +399,15 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
         
         try:
             # Initiate the scan
-            detection_result = url.scan_for_malware()
+            scan_result = url.scan_for_malware()
             
-            # Return the current status
+            # Return the scan result
             return Response({
-                'success': True,
-                'message': 'Malware scan initiated',
-                'status': detection_result.status if detection_result else 'pending',
-                'details': detection_result.details if detection_result else 'Scan in progress'
+                'success': scan_result['success'],
+                'message': scan_result['message'],
+                'status': scan_result['status'],
+                'details': scan_result['details'],
+                'fallback_used': scan_result.get('fallback_used', False)
             })
         except Exception as e:
             # Log the error and return a friendly response
@@ -417,7 +418,8 @@ class ShortenedURLViewSet(viewsets.ModelViewSet):
             return Response({
                 'success': False,
                 'message': 'Failed to initiate malware scan',
-                'error': str(e)
+                'error': str(e),
+                'fallback_used': True
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(detail=True, methods=['post'])

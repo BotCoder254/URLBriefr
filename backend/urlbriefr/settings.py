@@ -51,8 +51,8 @@ INSTALLED_APPS = [
     'analytics',
 ]
 
-# Add Anymail to installed apps
-INSTALLED_APPS += ['anymail']
+# Add Anymail to installed apps (commented out - install anymail if needed)
+# INSTALLED_APPS += ['anymail']
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

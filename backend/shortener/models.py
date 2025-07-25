@@ -298,8 +298,6 @@ class ShortenedURL(models.Model):
     
     def scan_for_malware(self):
         """Initiate a scan for malware and phishing."""
-        from .tasks import scan_url_for_threats
-        
         # Create or update malware detection result
         if self.malware_detection:
             detection_result = self.malware_detection
@@ -314,38 +312,77 @@ class ShortenedURL(models.Model):
         detection_result.save(update_fields=['status'])
         
         try:
-            # Try to use Celery for asynchronous processing
-            scan_url_for_threats.delay(self.id)
-            detection_result.details = "Scan in progress..."
-            detection_result.save(update_fields=['details'])
+            # Try to use Celery for asynchronous processing if available
+            try:
+                from .tasks import scan_url_for_threats, CELERY_AVAILABLE
+                if CELERY_AVAILABLE and hasattr(scan_url_for_threats, 'delay'):
+                    scan_url_for_threats.delay(self.id)
+                    detection_result.details = "Scan in progress..."
+                    detection_result.save(update_fields=['details'])
+                    return {
+                        'success': True,
+                        'message': 'Scan initiated (async)',
+                        'status': detection_result.status,
+                        'details': detection_result.details,
+                        'fallback_used': False
+                    }
+                else:
+                    raise ImportError("Celery not available")
+            except (ImportError, AttributeError, Exception) as e:
+                # Celery not available or failed, perform synchronous scan
+                import logging
+                logger = logging.getLogger(__name__)
+                if isinstance(e, (ImportError, AttributeError)):
+                    logger.info("Celery not available, performing synchronous scan")
+                else:
+                    logger.warning(f"Failed to queue malware scan task: {str(e)}")
+            
+            # Perform synchronous scan as fallback
+            from .utils import scan_url_for_threats_sync
+            scan_result = scan_url_for_threats_sync(self.id)
+            
+            if scan_result:
+                # Refresh the detection result from database
+                self.refresh_from_db()
+                detection_result = self.malware_detection
+                detection_result.details = detection_result.details + " (Performed synchronously)"
+                detection_result.save(update_fields=['details'])
+                
+                return {
+                    'success': True,
+                    'message': 'Scan completed',
+                    'status': detection_result.status,
+                    'details': detection_result.details,
+                    'fallback_used': True
+                }
+            else:
+                detection_result.status = 'error'
+                detection_result.details = "Failed to perform scan"
+                detection_result.save()
+                
+                return {
+                    'success': False,
+                    'message': 'Scan failed',
+                    'status': detection_result.status,
+                    'details': detection_result.details,
+                    'fallback_used': True
+                }
+            
         except Exception as e:
-            # If Celery is not available or fails, handle the scan directly
             import logging
             logger = logging.getLogger(__name__)
-            logger.error(f"Failed to queue malware scan task: {str(e)}")
+            logger.error(f"Failed to perform malware scan: {str(e)}")
+            detection_result.status = 'error'
+            detection_result.details = f"Scan failed: {str(e)}"
+            detection_result.save()
             
-            try:
-                # Try to perform a simple scan directly
-                from .tasks import simple_url_safety_check
-                result = simple_url_safety_check(self.original_url)
-                detection_result.status = result['status']
-                detection_result.details = result['details'] + " (Performed synchronously due to worker unavailability)"
-                detection_result.confidence_score = result['confidence']
-                detection_result.save()
-                logger.info(f"Performed synchronous fallback scan for URL {self.id}: {result['status']}")
-            except Exception as inner_e:
-                logger.error(f"Failed to perform direct scan: {str(inner_e)}")
-                detection_result.status = 'error'
-                detection_result.details = f"Scan failed: Worker unavailable and direct scan error: {str(inner_e)}"
-                detection_result.save()
-            
-        return {
-            'success': True,
-            'message': 'Scan initiated',
-            'status': detection_result.status,
-            'details': detection_result.details,
-            'fallback_used': 'worker unavailable' in detection_result.details if detection_result.details else False
-        }
+            return {
+                'success': False,
+                'message': 'Scan failed',
+                'status': detection_result.status,
+                'details': detection_result.details,
+                'fallback_used': True
+            }
     
     def clone(self, user=None, modifications=None):
         """Clone this URL with optional modifications."""

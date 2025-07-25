@@ -22,7 +22,7 @@ class UserManager(BaseUserManager):
         """Create and save a regular User with the given email and password."""
         extra_fields.setdefault('is_staff', False)
         extra_fields.setdefault('is_superuser', False)
-        extra_fields.setdefault('role', User.Role.USER)
+        extra_fields.setdefault('role', 'USER')
         # Set new users to inactive until email verification
         extra_fields.setdefault('is_active', False)
         return self._create_user(email, password, **extra_fields)
@@ -31,7 +31,7 @@ class UserManager(BaseUserManager):
         """Create and save a SuperUser with the given email and password."""
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('role', User.Role.ADMIN)
+        extra_fields.setdefault('role', 'ADMIN')
         extra_fields.setdefault('is_active', True)
         extra_fields.setdefault('email_verified', True)
 
