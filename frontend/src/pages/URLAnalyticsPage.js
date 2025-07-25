@@ -14,7 +14,7 @@ const URLAnalyticsPage = () => {
   const [copied, setCopied] = useState(false);
   const [statusToggling, setStatusToggling] = useState(false);
   const [updatingPreview, setUpdatingPreview] = useState(false);
-  
+
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
@@ -29,7 +29,7 @@ const URLAnalyticsPage = () => {
         setLoading(false);
       }
     };
-    
+
     fetchAnalytics();
   }, [id]);
 
@@ -39,13 +39,13 @@ const URLAnalyticsPage = () => {
     const date = new Date(dateStr);
     return `${date.getMonth() + 1}/${date.getDate()}`;
   };
-  
+
   const handleCopy = () => {
     if (!analytics?.url?.full_short_url) {
       console.error('Analytics URL or full_short_url is undefined');
       return;
     }
-    
+
     navigator.clipboard.writeText(analytics.url.full_short_url)
       .then(() => {
         setCopied(true);
@@ -55,18 +55,18 @@ const URLAnalyticsPage = () => {
         console.error('Could not copy text: ', err);
       });
   };
-  
+
   const handleToggleStatus = async () => {
     if (!analytics?.url) return;
-    
+
     setStatusToggling(true);
-    
+
     try {
       const updatedUrl = await urlService.toggleUrlStatus(
-        analytics.url.id, 
+        analytics.url.id,
         !analytics.url.is_active
       );
-      
+
       // Update analytics with the new URL data
       setAnalytics({
         ...analytics,
@@ -79,39 +79,39 @@ const URLAnalyticsPage = () => {
       setStatusToggling(false);
     }
   };
-  
+
   // Check if URL is expired
   const isExpired = (url) => {
     if (!url || !url.expires_at) return false;
     return new Date(url.expires_at) < new Date();
   };
-  
+
   // Process device data to handle "Unknown" devices better
   const processDeviceData = (deviceData) => {
     if (!deviceData || !Array.isArray(deviceData) || deviceData.length === 0) {
       return [{ name: 'No Data', value: 1 }];
     }
-    
+
     // Map device types to more user-friendly names and icons
     return deviceData.map(item => {
       const deviceName = item.device || 'Unknown';
       let displayName = deviceName;
-      
+
       // For visualization, group similar devices
-      if (deviceName.toLowerCase().includes('iphone') || 
-          deviceName.toLowerCase().includes('android') ||
-          deviceName.toLowerCase().includes('mobile')) {
+      if (deviceName.toLowerCase().includes('iphone') ||
+        deviceName.toLowerCase().includes('android') ||
+        deviceName.toLowerCase().includes('mobile')) {
         displayName = 'Mobile';
-      } else if (deviceName.toLowerCase().includes('ipad') || 
-                deviceName.toLowerCase().includes('tablet')) {
-        displayName = 'Tablet';  
-      } else if (deviceName.toLowerCase() === 'unknown' || 
-                deviceName.toLowerCase() === 'other') {
+      } else if (deviceName.toLowerCase().includes('ipad') ||
+        deviceName.toLowerCase().includes('tablet')) {
+        displayName = 'Tablet';
+      } else if (deviceName.toLowerCase() === 'unknown' ||
+        deviceName.toLowerCase() === 'other') {
         displayName = 'Unknown Device';
       } else {
         displayName = 'Desktop';
       }
-      
+
       return {
         name: displayName,
         value: item.count,
@@ -119,7 +119,7 @@ const URLAnalyticsPage = () => {
       };
     });
   };
-  
+
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -130,27 +130,27 @@ const URLAnalyticsPage = () => {
       }
     }
   };
-  
+
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 }
   };
-  
+
   // COLORS for charts
   const COLORS = ['#0ea5e9', '#d946ef', '#10b981', '#f97316', '#f43f5e', '#8b5cf6'];
-  
+
   // Add this section to display the location data
   const LocationSection = ({ analytics }) => {
     if (!analytics || !analytics.clicks_by_country || analytics.clicks_by_country.length === 0) {
       return null;
     }
-    
+
     return (
       <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-soft p-6">
         <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
           Location Analytics
         </h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Country chart */}
           <div>
@@ -160,7 +160,7 @@ const URLAnalyticsPage = () => {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={analytics.clicks_by_country.map(item => ({
-                      name: item.country || 'Unknown',
+                      name: item.country && item.country !== 'Unknown' ? item.country : 'Not Available',
                       clicks: item.count
                     }))}
                     layout="vertical"
@@ -168,9 +168,9 @@ const URLAnalyticsPage = () => {
                   >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis type="number" />
-                    <YAxis 
-                      type="category" 
-                      dataKey="name" 
+                    <YAxis
+                      type="category"
+                      dataKey="name"
                       tick={{ fontSize: 12 }}
                       width={80}
                     />
@@ -185,7 +185,7 @@ const URLAnalyticsPage = () => {
               )}
             </div>
           </div>
-          
+
           {/* City table */}
           <div>
             <h4 className="text-base font-medium text-dark-800 mb-3">Top Cities</h4>
@@ -209,10 +209,10 @@ const URLAnalyticsPage = () => {
                     {analytics.clicks_by_city.map((city, index) => (
                       <tr key={index} className="hover:bg-gray-50">
                         <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-dark-800">
-                          {city.city || 'Unknown'}
+                          {city.city && city.city !== 'Unknown' ? city.city : 'Not Available'}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
-                          {city.country || 'Unknown'}
+                          {city.country && city.country !== 'Unknown' ? city.country : 'Not Available'}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
                           {city.count}
@@ -238,13 +238,13 @@ const URLAnalyticsPage = () => {
     if (!analytics || !analytics.recent_clicks || analytics.recent_clicks.length === 0) {
       return null;
     }
-    
+
     return (
       <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-soft p-6">
         <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
           Recent Visitors
         </h3>
-        
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -273,16 +273,16 @@ const URLAnalyticsPage = () => {
                     {new Date(click.timestamp).toLocaleString()}
                   </td>
                   <td className="px-4 py-2 whitespace-nowrap text-sm font-mono text-dark-700">
-                    {click.ip_address || 'Unknown'}
+                    {click.ip_address || 'Not Available'}
                   </td>
                   <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
-                    {click.city ? `${click.city}, ` : ''}{click.country || 'Unknown'}
+                    {click.city && click.city !== 'Unknown' ? `${click.city}, ` : ''}{click.country && click.country !== 'Unknown' ? click.country : 'Not Available'}
                   </td>
                   <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
-                    {click.device || 'Unknown'} / {(click.browser || 'Unknown').split(' ')[0]}
+                    {click.device && click.device !== 'Unknown' ? click.device : 'Not Available'} / {click.browser && click.browser !== 'Unknown' ? click.browser.split(' ')[0] : 'Not Available'}
                   </td>
                   <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
-                    {(click.os || 'Unknown').split(' ')[0]}
+                    {click.os && click.os !== 'Unknown' ? click.os.split(' ')[0] : 'Not Available'}
                   </td>
                 </tr>
               ))}
@@ -292,13 +292,13 @@ const URLAnalyticsPage = () => {
       </motion.div>
     );
   };
-  
+
   // Add this section after LocationSection
   const ABTestingSection = ({ analytics }) => {
     if (!analytics || !analytics.url || !analytics.url.is_ab_test || !analytics.url.variants || analytics.url.variants.length === 0) {
       return null;
     }
-    
+
     return (
       <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-soft p-6">
         <div className="flex items-center mb-4">
@@ -307,34 +307,34 @@ const URLAnalyticsPage = () => {
           </div>
           <h3 className="text-lg font-display font-medium text-dark-900">A/B Testing Analytics</h3>
         </div>
-        
+
         <ABTestingStats variants={analytics.url.variants} />
       </motion.div>
     );
   };
-  
+
   // Add Retention Metrics Section
   const RetentionMetricsSection = ({ analytics }) => {
     if (!analytics || !analytics.retention) {
       return null;
     }
-    
+
     const { retention } = analytics;
-    
+
     // Prepare data for return visit distribution chart
-    const returnVisitData = retention.return_visit_distribution 
+    const returnVisitData = retention.return_visit_distribution
       ? retention.return_visit_distribution.map(item => ({
-          name: `${item.visit_count} visits`,
-          value: item.session_count
-        }))
+        name: `${item.visit_count} visits`,
+        value: item.session_count
+      }))
       : [];
-    
+
     return (
       <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-soft p-6">
         <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
           Visitor Retention Analysis
         </h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           {/* 1-Day Retention */}
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -348,7 +348,7 @@ const URLAnalyticsPage = () => {
               </span>
             </div>
           </div>
-          
+
           {/* 7-Day Retention */}
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <h4 className="text-sm font-medium text-dark-600 mb-1">7-Day Retention</h4>
@@ -361,7 +361,7 @@ const URLAnalyticsPage = () => {
               </span>
             </div>
           </div>
-          
+
           {/* 30-Day Retention */}
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <h4 className="text-sm font-medium text-dark-600 mb-1">30-Day Retention</h4>
@@ -375,7 +375,7 @@ const URLAnalyticsPage = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Return Visit Distribution Chart */}
           <div>
@@ -391,7 +391,7 @@ const URLAnalyticsPage = () => {
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
-                      label={({name, percent}) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
                       labelLine={false}
                     >
                       {returnVisitData.map((entry, index) => (
@@ -409,7 +409,7 @@ const URLAnalyticsPage = () => {
               )}
             </div>
           </div>
-          
+
           {/* Retention Stats */}
           <div>
             <h4 className="text-base font-medium text-dark-800 mb-3">Retention Statistics</h4>
@@ -420,26 +420,26 @@ const URLAnalyticsPage = () => {
                     <p className="text-xs text-dark-500">Total Sessions</p>
                     <p className="text-lg font-display font-semibold">{retention.total_sessions}</p>
                   </div>
-                  
+
                   <div>
                     <p className="text-xs text-dark-500">Avg. Return Time</p>
                     <p className="text-lg font-display font-semibold">
-                      {retention.avg_return_time_hours 
-                        ? `${retention.avg_return_time_hours} hours` 
+                      {retention.avg_return_time_hours
+                        ? `${retention.avg_return_time_hours} hours`
                         : 'N/A'}
                     </p>
                   </div>
                 </div>
               </div>
-              
+
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-sm font-medium mb-2">Key Insights</p>
                 <ul className="text-xs text-dark-500 space-y-1">
-                  <li>• {retention.one_day_retention_rate > 5 
-                    ? `Strong 1-day retention at ${retention.one_day_retention_rate}%` 
+                  <li>• {retention.one_day_retention_rate > 5
+                    ? `Strong 1-day retention at ${retention.one_day_retention_rate}%`
                     : `Low 1-day retention at ${retention.one_day_retention_rate}%`}</li>
-                  <li>• {retention.seven_day_retention_rate > 2 
-                    ? `Good 7-day retention at ${retention.seven_day_retention_rate}%` 
+                  <li>• {retention.seven_day_retention_rate > 2
+                    ? `Good 7-day retention at ${retention.seven_day_retention_rate}%`
                     : `Weak 7-day retention at ${retention.seven_day_retention_rate}%`}</li>
                   <li>• Average visitor returns in {retention.avg_return_time_hours || 'N/A'} hours</li>
                 </ul>
@@ -456,36 +456,36 @@ const URLAnalyticsPage = () => {
     if (!analytics || !analytics.funnel) {
       return null;
     }
-    
+
     const { funnel } = analytics;
     const { stages, drop_offs } = funnel;
-    
+
     // Calculate conversion percentages
-    const destinationRate = stages.total_clicks > 0 
-      ? (stages.reached_destination / stages.total_clicks * 100).toFixed(1) 
+    const destinationRate = stages.total_clicks > 0
+      ? (stages.reached_destination / stages.total_clicks * 100).toFixed(1)
       : 0;
-      
-    const actionRate = stages.reached_destination > 0 
-      ? (stages.completed_action / stages.reached_destination * 100).toFixed(1) 
+
+    const actionRate = stages.reached_destination > 0
+      ? (stages.completed_action / stages.reached_destination * 100).toFixed(1)
       : 0;
-      
-    const overallRate = stages.total_clicks > 0 
-      ? (stages.completed_action / stages.total_clicks * 100).toFixed(1) 
+
+    const overallRate = stages.total_clicks > 0
+      ? (stages.completed_action / stages.total_clicks * 100).toFixed(1)
       : 0;
-    
+
     // Prepare data for funnel chart
     const funnelData = [
       { name: 'Clicks', value: stages.total_clicks },
       { name: 'Destination', value: stages.reached_destination },
       { name: 'Action Completed', value: stages.completed_action }
     ];
-    
+
     return (
       <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-soft p-6">
         <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
           Conversion Funnel Analysis
         </h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           {/* Click to Destination */}
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -502,7 +502,7 @@ const URLAnalyticsPage = () => {
               {drop_offs.click_to_destination}% drop-off
             </div>
           </div>
-          
+
           {/* Destination to Action */}
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <h4 className="text-sm font-medium text-dark-600 mb-1">Destination → Action</h4>
@@ -518,7 +518,7 @@ const URLAnalyticsPage = () => {
               {drop_offs.destination_to_action}% drop-off
             </div>
           </div>
-          
+
           {/* Overall Conversion */}
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <h4 className="text-sm font-medium text-dark-600 mb-1">Overall Conversion</h4>
@@ -535,7 +535,7 @@ const URLAnalyticsPage = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="grid grid-cols-1 gap-6">
           {/* Funnel Visualization */}
           <div>
@@ -557,45 +557,45 @@ const URLAnalyticsPage = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="mt-6 bg-gray-50 rounded-lg p-4">
           <p className="text-sm font-medium mb-2">Funnel Insights</p>
           <ul className="text-xs text-dark-500 space-y-1">
-            <li>• {drop_offs.click_to_destination > 50 
-              ? `High drop-off (${drop_offs.click_to_destination}%) between clicks and destination visits` 
+            <li>• {drop_offs.click_to_destination > 50
+              ? `High drop-off (${drop_offs.click_to_destination}%) between clicks and destination visits`
               : `Good destination visit rate with only ${drop_offs.click_to_destination}% drop-off`}</li>
-            <li>• {drop_offs.destination_to_action > 70 
-              ? `Very high drop-off (${drop_offs.destination_to_action}%) from destination to action completion` 
-              : drop_offs.destination_to_action > 40 
+            <li>• {drop_offs.destination_to_action > 70
+              ? `Very high drop-off (${drop_offs.destination_to_action}%) from destination to action completion`
+              : drop_offs.destination_to_action > 40
                 ? `Moderate drop-off (${drop_offs.destination_to_action}%) from destination to action completion`
                 : `Strong action completion rate with only ${drop_offs.destination_to_action}% drop-off`}</li>
-            <li>• Overall funnel efficiency: {overallRate > 25 
-              ? 'Excellent' 
-              : overallRate > 10 
-                ? 'Good' 
-                : overallRate > 5 
-                  ? 'Average' 
+            <li>• Overall funnel efficiency: {overallRate > 25
+              ? 'Excellent'
+              : overallRate > 10
+                ? 'Good'
+                : overallRate > 5
+                  ? 'Average'
                   : 'Poor'}</li>
           </ul>
         </div>
       </motion.div>
     );
   };
-  
+
   // Add PreviewSection component after the LocationSection component
   const PreviewSection = ({ url, onUpdatePreview, isUpdating }) => {
     if (!url) return null;
-    
-    const hasPreviewData = url.enable_preview && 
+
+    const hasPreviewData = url.enable_preview &&
       (url.preview_image || url.preview_title || url.preview_description);
-    
+
     return (
       <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-soft p-6 mb-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-display font-medium text-dark-900">
             <FiEye className="inline mr-2" /> Destination Preview
           </h3>
-          
+
           <button
             onClick={onUpdatePreview}
             disabled={isUpdating}
@@ -604,33 +604,33 @@ const URLAnalyticsPage = () => {
             {isUpdating ? 'Updating...' : 'Update Preview'}
           </button>
         </div>
-        
+
         {url.enable_preview ? (
           hasPreviewData ? (
             <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
               {url.preview_image && (
                 <div className="relative h-64 bg-gray-100">
-                  <img 
-                    src={url.preview_image} 
-                    alt={url.preview_title || "Preview"} 
+                  <img
+                    src={url.preview_image}
+                    alt={url.preview_title || "Preview"}
                     className="w-full h-full object-cover"
                   />
                 </div>
               )}
-              
+
               <div className="p-4">
                 {url.preview_title && (
                   <h3 className="font-medium text-lg mb-2 text-dark-900">
                     {url.preview_title}
                   </h3>
                 )}
-                
+
                 {url.preview_description && (
                   <p className="text-dark-600 text-sm mb-4">
                     {url.preview_description}
                   </p>
                 )}
-                
+
                 {url.preview_updated_at && (
                   <div className="text-sm text-dark-500 flex items-center">
                     <FiCalendar className="mr-1" />
@@ -638,9 +638,9 @@ const URLAnalyticsPage = () => {
                   </div>
                 )}
               </div>
-              
+
               <div className="p-3 bg-gray-50 border-t border-gray-200">
-                <a 
+                <a
                   href={url.original_url}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -671,13 +671,13 @@ const URLAnalyticsPage = () => {
       </motion.div>
     );
   };
-  
+
   // Add handleUpdatePreview function
   const handleUpdatePreview = async () => {
     if (!analytics?.url) return;
-    
+
     setUpdatingPreview(true);
-    
+
     try {
       const result = await urlService.updatePreview(id);
       if (result && result.success) {
@@ -700,7 +700,7 @@ const URLAnalyticsPage = () => {
       setUpdatingPreview(false);
     }
   };
-  
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
@@ -708,7 +708,7 @@ const URLAnalyticsPage = () => {
       </div>
     );
   }
-  
+
   if (error) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -719,7 +719,7 @@ const URLAnalyticsPage = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="bg-gray-50 min-h-[calc(100vh-4rem)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -734,7 +734,7 @@ const URLAnalyticsPage = () => {
               <FiArrowLeft className="mr-1" /> Back to Dashboard
             </Link>
           </motion.div>
-          
+
           {analytics?.url && (
             <>
               <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-soft p-6">
@@ -745,7 +745,7 @@ const URLAnalyticsPage = () => {
                       <span className="font-medium text-primary-600 mr-2">
                         {analytics.url.full_short_url || `${window.location.origin}/s/${analytics.url.short_code}`}
                       </span>
-                      <button 
+                      <button
                         onClick={handleCopy}
                         className="text-dark-400 hover:text-dark-600"
                         title="Copy to clipboard"
@@ -807,14 +807,14 @@ const URLAnalyticsPage = () => {
                   </div>
                 </div>
               </motion.div>
-              
+
               {/* Preview Section - Add this new section */}
-              <PreviewSection 
+              <PreviewSection
                 url={analytics.url}
                 onUpdatePreview={handleUpdatePreview}
                 isUpdating={updatingPreview}
               />
-              
+
               {/* Stats Overview */}
               <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 <div className="bg-white rounded-xl shadow-soft p-6">
@@ -830,7 +830,7 @@ const URLAnalyticsPage = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="bg-white rounded-xl shadow-soft p-6">
                   <div className="flex items-center">
                     <div className="h-12 w-12 rounded-md bg-secondary-500 text-white flex items-center justify-center mr-4">
@@ -844,7 +844,7 @@ const URLAnalyticsPage = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="bg-white rounded-xl shadow-soft p-6">
                   <div className="flex items-center">
                     <div className="h-12 w-12 rounded-md bg-secondary-500 text-white flex items-center justify-center mr-4">
@@ -853,14 +853,16 @@ const URLAnalyticsPage = () => {
                     <div>
                       <p className="text-dark-500 text-sm font-medium">Top Country</p>
                       <h3 className="text-2xl font-display font-bold text-dark-900">
-                        {analytics.clicks_by_country && analytics.clicks_by_country.length > 0 
-                          ? analytics.clicks_by_country[0].country || 'Unknown' 
-                          : 'N/A'}
+                        {analytics.clicks_by_country && analytics.clicks_by_country.length > 0
+                          ? (analytics.clicks_by_country[0].country && analytics.clicks_by_country[0].country !== 'Unknown'
+                            ? analytics.clicks_by_country[0].country
+                            : 'Not Available')
+                          : 'No Data'}
                       </h3>
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="bg-white rounded-xl shadow-soft p-6">
                   <div className="flex items-center">
                     <div className="h-12 w-12 rounded-md bg-accent-500 text-white flex items-center justify-center mr-4">
@@ -875,7 +877,7 @@ const URLAnalyticsPage = () => {
                   </div>
                 </div>
               </motion.div>
-              
+
               {/* Charts Row 1 */}
               <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Clicks Over Time Chart */}
@@ -897,12 +899,12 @@ const URLAnalyticsPage = () => {
                           <XAxis dataKey="date" />
                           <YAxis />
                           <Tooltip />
-                          <Line 
-                            type="monotone" 
-                            dataKey="clicks" 
-                            stroke="#0ea5e9" 
+                          <Line
+                            type="monotone"
+                            dataKey="clicks"
+                            stroke="#0ea5e9"
                             strokeWidth={2}
-                            activeDot={{ r: 8 }} 
+                            activeDot={{ r: 8 }}
                           />
                         </LineChart>
                       </ResponsiveContainer>
@@ -913,7 +915,7 @@ const URLAnalyticsPage = () => {
                     )}
                   </div>
                 </div>
-                
+
                 {/* Browser Chart */}
                 <div className="bg-white rounded-xl shadow-soft p-6">
                   <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
@@ -925,7 +927,7 @@ const URLAnalyticsPage = () => {
                         <PieChart>
                           <Pie
                             data={analytics.clicks_by_browser.map(item => ({
-                              name: (item.browser || 'Unknown').split(' ')[0], // Get just the browser name without version
+                              name: item.browser && item.browser !== 'Unknown' ? item.browser.split(' ')[0] : 'Not Available', // Get just the browser name without version
                               value: item.count
                             }))}
                             cx="50%"
@@ -953,7 +955,7 @@ const URLAnalyticsPage = () => {
                   </div>
                 </div>
               </motion.div>
-              
+
               {/* Charts Row 2 */}
               <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Device Chart */}
@@ -980,11 +982,11 @@ const URLAnalyticsPage = () => {
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip 
+                          <Tooltip
                             formatter={(value, name, props) => [
-                              `${value} clicks`, 
+                              `${value} clicks`,
                               props.payload.originalName || name
-                            ]} 
+                            ]}
                           />
                           <Legend />
                         </PieChart>
@@ -996,7 +998,7 @@ const URLAnalyticsPage = () => {
                     )}
                   </div>
                 </div>
-                
+
                 {/* OS Chart */}
                 <div className="bg-white rounded-xl shadow-soft p-6">
                   <h3 className="text-lg font-display font-medium text-dark-900 mb-4">
@@ -1008,7 +1010,7 @@ const URLAnalyticsPage = () => {
                         <PieChart>
                           <Pie
                             data={analytics.clicks_by_os.map(item => ({
-                              name: (item.os || 'Unknown').split(' ')[0], // Get just the OS name without version
+                              name: item.os && item.os !== 'Unknown' ? item.os.split(' ')[0] : 'Not Available', // Get just the OS name without version
                               value: item.count
                             }))}
                             cx="50%"
@@ -1036,19 +1038,19 @@ const URLAnalyticsPage = () => {
                   </div>
                 </div>
               </motion.div>
-              
+
               {/* Add the new location section */}
               <LocationSection analytics={analytics} />
-              
+
               {/* Add the AB testing section */}
               <ABTestingSection analytics={analytics} />
-              
+
               {/* Add the recent visitors section */}
               <RecentVisitorsSection analytics={analytics} />
-              
+
               {/* Add Retention Metrics Section */}
               <RetentionMetricsSection analytics={analytics} />
-              
+
               {/* Add Funnel Analysis Section */}
               <FunnelAnalysisSection analytics={analytics} />
             </>

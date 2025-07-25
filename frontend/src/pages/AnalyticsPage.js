@@ -194,7 +194,7 @@ const AnalyticsPage = () => {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={dashboardStats.clicks_by_country.map(item => ({
-                        name: item.country || 'Unknown',
+                        name: item.country && item.country !== 'Unknown' ? item.country : 'Not Available',
                         clicks: item.count
                       }))}
                       layout="vertical"
@@ -243,10 +243,10 @@ const AnalyticsPage = () => {
                       {dashboardStats.clicks_by_city.map((city, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-dark-800">
-                            {city.city || 'Unknown'}
+                            {city.city && city.city !== 'Unknown' ? city.city : 'Not Available'}
                           </td>
                           <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
-                            {city.country || 'Unknown'}
+                            {city.country && city.country !== 'Unknown' ? city.country : 'Not Available'}
                           </td>
                           <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
                             {city.count}
@@ -315,16 +315,16 @@ const AnalyticsPage = () => {
                       {click.url__short_code}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm font-mono text-dark-700">
-                      {click.ip_address || 'Unknown'}
+                      {click.ip_address || 'Not Available'}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
-                      {click.city ? `${click.city}, ` : ''}{click.country || 'Unknown'}
+                      {click.city && click.city !== 'Unknown' ? `${click.city}, ` : ''}{click.country && click.country !== 'Unknown' ? click.country : 'Not Available'}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
-                      {click.device || 'Unknown'} / {(click.browser || 'Unknown').split(' ')[0]}
+                      {click.device && click.device !== 'Unknown' ? click.device : 'Not Available'} / {click.browser && click.browser !== 'Unknown' ? click.browser.split(' ')[0] : 'Not Available'}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-dark-700">
-                      {(click.os || 'Unknown').split(' ')[0]}
+                      {click.os && click.os !== 'Unknown' ? click.os.split(' ')[0] : 'Not Available'}
                     </td>
                   </tr>
                 ))}
@@ -462,7 +462,7 @@ const AnalyticsPage = () => {
                         <PieChart>
                           <Pie
                             data={dashboardStats.clicks_by_device.map(item => ({
-                              name: item.device || 'Unknown',
+                              name: item.device && item.device !== 'Unknown' ? item.device : 'Not Available',
                               value: item.count
                             }))}
                             cx="50%"
@@ -501,7 +501,7 @@ const AnalyticsPage = () => {
                         <PieChart>
                           <Pie
                             data={dashboardStats.clicks_by_browser.map(item => ({
-                              name: (item.browser || 'Unknown').split(' ')[0], // Get just the browser name without version
+                              name: item.browser && item.browser !== 'Unknown' ? item.browser.split(' ')[0] : 'Not Available', // Get just the browser name without version
                               value: item.count
                             }))}
                             cx="50%"
@@ -540,7 +540,7 @@ const AnalyticsPage = () => {
                         <PieChart>
                           <Pie
                             data={dashboardStats.clicks_by_os.map(item => ({
-                              name: (item.os || 'Unknown').split(' ')[0], // Get just the OS name without version
+                              name: item.os && item.os !== 'Unknown' ? item.os.split(' ')[0] : 'Not Available', // Get just the OS name without version
                               value: item.count
                             }))}
                             cx="50%"

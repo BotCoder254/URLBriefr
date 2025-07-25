@@ -25,9 +25,56 @@ import hashlib
 from django.db.models import Count, Q
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+import json
 
 # Constants for user limits
 MAX_FOLDERS_PER_USER = 5
+
+def get_location_from_ip(ip_address):
+    """Get country and city from IP address using a free geolocation service."""
+    if not ip_address or ip_address in ['127.0.0.1', 'localhost', '::1']:
+        return {'country': 'Unknown', 'city': 'Unknown'}
+    
+    try:
+        # Using ipapi.co free service (1000 requests per day)
+        response = requests.get(f'https://ipapi.co/{ip_address}/json/', timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            country = data.get('country_name', 'Unknown')
+            city = data.get('city', 'Unknown')
+            
+            # Handle empty or null values
+            if not country or country.lower() in ['none', 'null', '']:
+                country = 'Unknown'
+            if not city or city.lower() in ['none', 'null', '']:
+                city = 'Unknown'
+                
+            return {'country': country, 'city': city}
+    except Exception as e:
+        print(f"Error getting location for IP {ip_address}: {str(e)}")
+    
+    # Fallback: try another free service
+    try:
+        # Using ip-api.com free service (1000 requests per hour)
+        response = requests.get(f'http://ip-api.com/json/{ip_address}', timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('status') == 'success':
+                country = data.get('country', 'Unknown')
+                city = data.get('city', 'Unknown')
+                
+                # Handle empty or null values
+                if not country or country.lower() in ['none', 'null', '']:
+                    country = 'Unknown'
+                if not city or city.lower() in ['none', 'null', '']:
+                    city = 'Unknown'
+                    
+                return {'country': country, 'city': city}
+    except Exception as e:
+        print(f"Error getting location from fallback service for IP {ip_address}: {str(e)}")
+    
+    # If all services fail, return Unknown
+    return {'country': 'Unknown', 'city': 'Unknown'}
 MAX_TAGS_PER_USER = 10
 MAX_IP_RESTRICTIONS_PER_USER = 20
 
@@ -614,7 +661,7 @@ def redirect_to_original(request, short_code):
         url = get_object_or_404(ShortenedURL, short_code=short_code)
         
         # Get client IP address for analytics and security checks
-        client_ip, is_routable = ipware.ip.get_client_ip(request)
+        client_ip, is_routable = get_client_ip(request)
         user_agent_string = request.META.get('HTTP_USER_AGENT', '')
         user_agent = parse(user_agent_string)
         
@@ -691,6 +738,9 @@ def redirect_to_original(request, short_code):
                             variant_id = variant.id
                             break
         
+        # Get location data from IP address
+        location_data = get_location_from_ip(client_ip)
+        
         # Create click event for analytics
         event = ClickEvent.objects.create(
             url=url,
@@ -699,6 +749,8 @@ def redirect_to_original(request, short_code):
             browser=user_agent.browser.family,
             os=user_agent.os.family,
             device=user_agent.device.family,
+            country=location_data['country'],
+            city=location_data['city'],
             session_id=session_id
         )
         
