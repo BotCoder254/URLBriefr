@@ -66,6 +66,7 @@ const Navbar = () => {
               
               <Link to="/tempmail" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-dark-700 dark:text-dark-200 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-500 transition-colors">
                 Temp Email
+                <span className="ml-1 px-1.5 py-0.5 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">BETA</span>
               </Link>
               
               {isLoggedIn && (
@@ -297,7 +298,10 @@ const Navbar = () => {
                   className="block px-3 py-2 rounded-md text-base font-medium text-dark-900 dark:text-white hover:bg-gray-100 dark:hover:bg-dark-700"
                   onClick={() => setIsOpen(false)}
                 >
-                  Temp Email
+                  <div className="flex items-center">
+                    Temp Email
+                    <span className="ml-2 px-1.5 py-0.5 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">BETA</span>
+                  </div>
                 </Link>
               
               {isLoggedIn ? (

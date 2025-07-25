@@ -12,7 +12,7 @@ A modern URL shortener with powerful analytics and customization options.
 - User authentication and role-based access control
 - Manage and search your shortened URLs
 
-### Temporary Email System
+### Temporary Email System (BETA)
 - **Generate Disposable Emails**: Create random, temporary email addresses instantly
 - **Real-time Inbox**: Receive emails in real-time with live updates
 - **Session Management**: Control email session duration (5-60 minutes)
@@ -21,6 +21,8 @@ A modern URL shortener with powerful analytics and customization options.
 - **No Registration**: Use temporary emails without creating an account
 - **Security Features**: Spam detection and sender blacklisting
 - **Mobile Responsive**: Works seamlessly on all devices
+
+> **Note**: The temporary email system is currently in beta. While fully functional, you may experience occasional issues as we continue to improve the service.
 
 ## Setup and Installation
 
