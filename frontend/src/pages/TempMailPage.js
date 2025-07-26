@@ -10,71 +10,104 @@ import tempmailService from '../services/tempmailService';
 
 // Helper function to sanitize and style HTML content
 const sanitizeAndStyleHtml = (html) => {
-  if (!html) return '';
-  
-  // Basic HTML sanitization and styling
-  let sanitized = html
-    // Ensure links open in new tab and are styled
-    .replace(/<a\s+([^>]*?)href=["']([^"']*?)["']([^>]*?)>/gi, 
-      '<a $1href="$2"$3 target="_blank" rel="noopener noreferrer" style="color: #3b82f6; text-decoration: underline;">')
-    // Style common elements
-    .replace(/<p\s*([^>]*)>/gi, '<p $1 style="margin: 0.5em 0; line-height: 1.6;">')
-    .replace(/<div\s*([^>]*)>/gi, '<div $1 style="margin: 0.25em 0;">')
-    .replace(/<h1\s*([^>]*)>/gi, '<h1 $1 style="font-size: 1.5em; font-weight: bold; margin: 1em 0 0.5em 0; color: #1f2937;">')
-    .replace(/<h2\s*([^>]*)>/gi, '<h2 $1 style="font-size: 1.3em; font-weight: bold; margin: 0.8em 0 0.4em 0; color: #1f2937;">')
-    .replace(/<h3\s*([^>]*)>/gi, '<h3 $1 style="font-size: 1.1em; font-weight: bold; margin: 0.6em 0 0.3em 0; color: #1f2937;">')
-    .replace(/<strong\s*([^>]*)>/gi, '<strong $1 style="font-weight: 600; color: #1f2937;">')
-    .replace(/<b\s*([^>]*)>/gi, '<b $1 style="font-weight: 600; color: #1f2937;">')
-    .replace(/<em\s*([^>]*)>/gi, '<em $1 style="font-style: italic; color: #4b5563;">')
-    .replace(/<i\s*([^>]*)>/gi, '<i $1 style="font-style: italic; color: #4b5563;">')
-    // Style tables
-    .replace(/<table\s*([^>]*)>/gi, '<table $1 style="border-collapse: collapse; width: 100%; margin: 1em 0;">')
-    .replace(/<td\s*([^>]*)>/gi, '<td $1 style="padding: 0.5em; border: 1px solid #e5e7eb;">')
-    .replace(/<th\s*([^>]*)>/gi, '<th $1 style="padding: 0.5em; border: 1px solid #e5e7eb; background-color: #f9fafb; font-weight: 600;">')
-    // Style lists
-    .replace(/<ul\s*([^>]*)>/gi, '<ul $1 style="margin: 0.5em 0; padding-left: 1.5em;">')
-    .replace(/<ol\s*([^>]*)>/gi, '<ol $1 style="margin: 0.5em 0; padding-left: 1.5em;">')
-    .replace(/<li\s*([^>]*)>/gi, '<li $1 style="margin: 0.25em 0;">')
-    // Style blockquotes
-    .replace(/<blockquote\s*([^>]*)>/gi, '<blockquote $1 style="border-left: 4px solid #e5e7eb; padding-left: 1em; margin: 1em 0; color: #6b7280; font-style: italic;">')
-    // Remove potentially dangerous elements while keeping content
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-    .replace(/on\w+="[^"]*"/gi, '') // Remove event handlers
-    .replace(/javascript:/gi, ''); // Remove javascript: links
-  
-  return sanitized;
+    if (!html) return '';
+
+    // Basic HTML sanitization and styling
+    let sanitized = html
+        // Ensure links open in new tab and are styled
+        .replace(/<a\s+([^>]*?)href=["']([^"']*?)["']([^>]*?)>/gi,
+            '<a $1href="$2"$3 target="_blank" rel="noopener noreferrer" style="color: #3b82f6; text-decoration: underline;">')
+        // Style common elements
+        .replace(/<p\s*([^>]*)>/gi, '<p $1 style="margin: 0.5em 0; line-height: 1.6;">')
+        .replace(/<div\s*([^>]*)>/gi, '<div $1 style="margin: 0.25em 0;">')
+        .replace(/<h1\s*([^>]*)>/gi, '<h1 $1 style="font-size: 1.5em; font-weight: bold; margin: 1em 0 0.5em 0; color: #1f2937;">')
+        .replace(/<h2\s*([^>]*)>/gi, '<h2 $1 style="font-size: 1.3em; font-weight: bold; margin: 0.8em 0 0.4em 0; color: #1f2937;">')
+        .replace(/<h3\s*([^>]*)>/gi, '<h3 $1 style="font-size: 1.1em; font-weight: bold; margin: 0.6em 0 0.3em 0; color: #1f2937;">')
+        .replace(/<strong\s*([^>]*)>/gi, '<strong $1 style="font-weight: 600; color: #1f2937;">')
+        .replace(/<b\s*([^>]*)>/gi, '<b $1 style="font-weight: 600; color: #1f2937;">')
+        .replace(/<em\s*([^>]*)>/gi, '<em $1 style="font-style: italic; color: #4b5563;">')
+        .replace(/<i\s*([^>]*)>/gi, '<i $1 style="font-style: italic; color: #4b5563;">')
+        // Style tables
+        .replace(/<table\s*([^>]*)>/gi, '<table $1 style="border-collapse: collapse; width: 100%; margin: 1em 0;">')
+        .replace(/<td\s*([^>]*)>/gi, '<td $1 style="padding: 0.5em; border: 1px solid #e5e7eb;">')
+        .replace(/<th\s*([^>]*)>/gi, '<th $1 style="padding: 0.5em; border: 1px solid #e5e7eb; background-color: #f9fafb; font-weight: 600;">')
+        // Style lists
+        .replace(/<ul\s*([^>]*)>/gi, '<ul $1 style="margin: 0.5em 0; padding-left: 1.5em;">')
+        .replace(/<ol\s*([^>]*)>/gi, '<ol $1 style="margin: 0.5em 0; padding-left: 1.5em;">')
+        .replace(/<li\s*([^>]*)>/gi, '<li $1 style="margin: 0.25em 0;">')
+        // Style blockquotes
+        .replace(/<blockquote\s*([^>]*)>/gi, '<blockquote $1 style="border-left: 4px solid #e5e7eb; padding-left: 1em; margin: 1em 0; color: #6b7280; font-style: italic;">')
+        // Remove potentially dangerous elements while keeping content
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+        .replace(/on\w+="[^"]*"/gi, '') // Remove event handlers
+        .replace(/javascript:/gi, ''); // Remove javascript: links
+
+    return sanitized;
 };
 
 // Helper function to linkify plain text
 const linkifyText = (text) => {
-  if (!text) return '';
-  
-  // URL regex pattern
-  const urlRegex = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/gi;
-  const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi;
-  
-  // Split text by lines to preserve formatting
-  const lines = text.split('\n');
-  
-  return lines.map((line, lineIndex) => {
-    // Replace URLs with clickable links
-    let processedLine = line.replace(urlRegex, (url) => {
-      return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #3b82f6; text-decoration: underline;">${url}</a>`;
+    if (!text) return '';
+
+    // URL regex pattern
+    const urlRegex = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/gi;
+    const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi;
+
+    // Split text by lines to preserve formatting
+    const lines = text.split('\n');
+
+    return lines.map((line, lineIndex) => {
+        // Replace URLs with clickable links
+        let processedLine = line.replace(urlRegex, (url) => {
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #3b82f6; text-decoration: underline;">${url}</a>`;
+        });
+
+        // Replace email addresses with mailto links
+        processedLine = processedLine.replace(emailRegex, (email) => {
+            return `<a href="mailto:${email}" style="color: #3b82f6; text-decoration: underline;">${email}</a>`;
+        });
+
+        return (
+            <span key={lineIndex}>
+                <span dangerouslySetInnerHTML={{ __html: processedLine }} />
+                {lineIndex < lines.length - 1 && <br />}
+            </span>
+        );
     });
-    
-    // Replace email addresses with mailto links
-    processedLine = processedLine.replace(emailRegex, (email) => {
-      return `<a href="mailto:${email}" style="color: #3b82f6; text-decoration: underline;">${email}</a>`;
-    });
-    
-    return (
-      <span key={lineIndex}>
-        <span dangerouslySetInnerHTML={{ __html: processedLine }} />
-        {lineIndex < lines.length - 1 && <br />}
-      </span>
-    );
-  });
+};
+
+// Helper function to get clean message preview text
+const getMessagePreview = (message) => {
+    if (!message) return '';
+
+    // Try to get preview from HTML content first, then fallback to text
+    let preview = '';
+
+    if (message.body_html) {
+        // Strip HTML tags and get plain text
+        preview = message.body_html
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove scripts
+            .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '') // Remove styles
+            .replace(/<[^>]*>/g, ' ') // Remove all HTML tags
+            .replace(/&nbsp;/g, ' ') // Replace &nbsp; with space
+            .replace(/&amp;/g, '&') // Replace &amp; with &
+            .replace(/&lt;/g, '<') // Replace &lt; with <
+            .replace(/&gt;/g, '>') // Replace &gt; with >
+            .replace(/&quot;/g, '"') // Replace &quot; with "
+            .replace(/&#39;/g, "'") // Replace &#39; with '
+            .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+            .trim();
+    } else if (message.body_text) {
+        preview = message.body_text.trim();
+    }
+
+    // Limit preview length and add ellipsis if needed
+    if (preview.length > 100) {
+        preview = preview.substring(0, 100) + '...';
+    }
+
+    return preview || 'No preview available';
 };
 
 const TempMailPage = () => {
@@ -584,6 +617,10 @@ const TempMailPage = () => {
                                                                     <p className={`text-sm mb-1 ${!message.is_read ? 'font-medium text-dark-900' : 'text-dark-600'
                                                                         }`}>
                                                                         {message.subject || '(No Subject)'}
+                                                                    </p>
+                                                                    {/* Message Preview */}
+                                                                    <p className="text-xs text-dark-500 mb-1 line-clamp-2">
+                                                                        {getMessagePreview(message)}
                                                                     </p>
                                                                     <p className="text-xs text-dark-500">
                                                                         {message.time_ago}
